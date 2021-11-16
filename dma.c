@@ -148,7 +148,7 @@ struct {
         page reserved;
     } RCC;
 
-} *const DEVMAP = (void *) 0x40000000;
+} volatile *const DEVMAP = (void *) 0x40000000;
 
 #define ENA_IRQ(IRQ) {NVIC->ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
 #define DIS_IRQ(IRQ) {NVIC->ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
@@ -168,7 +168,7 @@ struct {
     uint8_t  IPR[240]; 
     uint32_t RES5[644]; 
     uint32_t STIR;
-} * const NVIC = ((void *) 0xE000E100);
+} volatile *const NVIC = ((void *) 0xE000E100);
 
 enum IRQs {
     IRQ_DMA1CHN2  = 12,     // DMA1 Channel 2 global Interrupt                     
