@@ -48,7 +48,7 @@ enum {TIM2  = 0, TIM3  = 1, TIM4  = 2 };
 enum {GPIOA = 0, GPIOB = 1, GPIOC = 2, GPIOD = 3, GPIOE = 4, GPIOF = 5 };
 enum {DMA1  = 0 };
 enum {CHN1  = 0, CHN2  = 1, CHN3  = 2, CHN4  = 3, CHN5  = 4, CHN6  = 5, CHN7 = 6, CHN8 = 7 };
-
+enum {ADC1  = 0 };
 struct {
     union {
         struct {
@@ -110,7 +110,25 @@ struct {
         page reserved;
     } GPIOs[5];
     word_t reserved7[(0x40012400-0x40011C00)/sizeof(word_t)];
-    page ADC[2];
+	union {
+		struct {
+			uint32_t SR;
+			uint32_t CR1;
+			uint32_t CR2;
+			uint32_t SMPR1;
+			uint32_t SMPR2;
+			uint32_t JOFR;
+			uint32_t HTR;
+			uint32_t LTR;
+			uint32_t SQR1;
+			uint32_t SQR2;
+			uint32_t SQR3;
+			uint32_t JSQR;
+			uint32_t JDR;
+			uint32_t DR;
+		} REGs;
+		page reserved;
+	} ADC[2];
     page TIM1;
     page SPI1;
     word_t reserved8[(0x40013800-0x40013400)/sizeof(word_t)];
@@ -315,6 +333,7 @@ uint32_t const data[256] = {
 int main(void)
 {
 
+	// PCLK code
     DEVMAP->RCC.REGs.CR   |= (1 << 16);                     // Enable HSE
     while (!(DEVMAP->RCC.REGs.CR & (1 << 17)));             // Wait for HSE is locked
 
@@ -329,6 +348,7 @@ int main(void)
     DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);                   // Select PLL clock as the system clock
     while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));         // Wait for PLL clock to be selected
 
+	// DMA code
     DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
     DEVMAP->RCC.REGs.APB1ENR |= (1 << 0);                   // Enable TIM2 clock.
     DEVMAP->RCC.REGs.AHBENR  |= (1 << 0);                   // Enable DMA1 clock.
@@ -368,8 +388,12 @@ int main(void)
 
     DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 0);               // Finally enable TIM1 module
 
+	// USART code
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 2);                   // Enable GPIOA clock
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 14);                  // Enable UART1 clock
+
 	DEVMAP->GPIOs[GPIOA].REGs.CRH &= 0xFFFFF00F;
-	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x00000BB0;			// CNF alternate function push pull, max speed 50 MHz
+	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x00000BB0;            // CNF alternate function push pull, max speed 50 MHz
 
 	DEVMAP->USART1.REGs.CR1 |= (1 << 13);                   // Enable USART1
 	DEVMAP->USART1.REGs.CR1 |= (0 << 12);                   // Word length - leave default (8 data)
@@ -378,6 +402,23 @@ int main(void)
 	DEVMAP->USART1.REGs.CR1 |= (1 << 3);                    // Transmitter enable
 	DEVMAP->USART1.REGs.CR1 |= (1 << 2);                    // Receiver enable
 	DEVMAP->USART1.REGs.CR1 |= (1 << 5);                    // RXNE interrupt enable
+    ENA_IRQ(IRQ_USART1);                                    // Enable USART1
+
+
+	// ADC code
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);                   // Enable ADC clock
+
+	DEVMAP->ADC[ADC1].REGs.CR1  &= ~(1 << 8);                    // SCAN mode disabled
+//	DEVMAP->ADC[ADC1].REGs.CR1  &= ~(3 <<ADC_CR1_RES_Pos);		// 12bit resolution
+	DEVMAP->ADC[ADC1].REGs.SQR3 &= ~0xFFFFFFFF;                  // Clears whole 32bit register
+	DEVMAP->ADC[ADC1].REGs.SQR3 |= (18 << 0);                    // First conversion in regular sequence: Temperature on ADC1_In18
+	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 1);                    // Single conversion
+	DEVMAP->ADC[ADC1].REGs.CR2  |= (0b101 << 17);                // TIM4 CC4 event as trigger source
+	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 11);                   // Right alignment
+	DEVMAP->ADC[ADC1].REGs.SMPR2 |= (0b111 << 0);                // 480 cycles. 16MHz bus clock for ADC. 1/16MHz = 62.5ns. 480*62.5ns=30us
+	//DEVMAP->ADC->CCR |= (1<<ADC_CCR_TSVREFE_Pos);			// Temp sensor and Vrefint enabled
+	//DEVMAP->ADC1->CR1 |= (1<<ADC_CR1_EOCIE_Pos);			// Interrupt enable
+	//DEVMAP->ADC1->CR2 |= (1<<ADC_CR2_ADON_Pos);				//
 
 	for(;;);
 
