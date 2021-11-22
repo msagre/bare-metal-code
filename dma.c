@@ -406,19 +406,18 @@ int main(void)
 
 
 	// ADC code
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);                   // Enable ADC clock
+    DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
 
-	DEVMAP->ADC[ADC1].REGs.CR1  &= ~(1 << 8);                    // SCAN mode disabled
-//	DEVMAP->ADC[ADC1].REGs.CR1  &= ~(3 <<ADC_CR1_RES_Pos);		// 12bit resolution
-	DEVMAP->ADC[ADC1].REGs.SQR3 &= ~0xFFFFFFFF;                  // Clears whole 32bit register
-	DEVMAP->ADC[ADC1].REGs.SQR3 |= (18 << 0);                    // First conversion in regular sequence: Temperature on ADC1_In18
-	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 1);                    // Single conversion
-	DEVMAP->ADC[ADC1].REGs.CR2  |= (0b101 << 17);                // TIM4 CC4 event as trigger source
-	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 11);                   // Right alignment
-	DEVMAP->ADC[ADC1].REGs.SMPR2 |= (0b111 << 0);                // 480 cycles. 16MHz bus clock for ADC. 1/16MHz = 62.5ns. 480*62.5ns=30us
-	//DEVMAP->ADC->CCR |= (1<<ADC_CCR_TSVREFE_Pos);			// Temp sensor and Vrefint enabled
-	//DEVMAP->ADC1->CR1 |= (1<<ADC_CR1_EOCIE_Pos);			// Interrupt enable
-	//DEVMAP->ADC1->CR2 |= (1<<ADC_CR2_ADON_Pos);				//
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);                   // Enable ADC clock
+	DEVMAP->GPIOs[GPIOC].REGs.CRL &= 0xFF00FFFF;			// Set PC5 and PC4 as analog input for ADC channel 15 and 14 respectively
+
+	DEVMAP->ADC[ADC1].REGs.CR1  &= ~(1 << 8);               // SCAN mode disabled
+	DEVMAP->ADC[ADC1].REGs.SQR3 &= ~0xFFFFFFFF;             // Clears whole 32bit register
+	DEVMAP->ADC[ADC1].REGs.SQR3 |= (14 << 0);               // First conversion in regular sequence: Temperature on ADC1_In18
+	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 1);               // Single conversion
+	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 11);              // Right alignment
+	DEVMAP->ADC[ADC1].REGs.CR1  |= ~(1 << 5);               // Enable EOC Interrupt
+	DEVMAP->ADC[ADC1].REGs.CR1  |= ~(1 << 0);               // Set ADC ON state
 
 	for(;;);
 
