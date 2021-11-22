@@ -181,25 +181,39 @@ struct {
 
 } volatile *const DEVMAP = (void *) 0x40000000;
 
-#define ENA_IRQ(IRQ) {NVIC->ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
-#define DIS_IRQ(IRQ) {NVIC->ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
-#define CLR_IRQ(IRQ) {NVIC->ICPR[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define ENA_IRQ(IRQ) {M3PHR->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define DIS_IRQ(IRQ) {M3PHR->NVIC.REGs.ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define CLR_IRQ(IRQ) {M3PHR->NVIC.REGs.ICPR[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
 
 struct {
-    uint32_t ISER[8];
-    uint32_t RES0[24];
-    uint32_t ICER[8];
-    uint32_t RES1[24];
-    uint32_t ISPR[8];
-    uint32_t RES2[24];
-    uint32_t ICPR[8];
-    uint32_t RES3[24];
-    uint32_t IABR[8];
-    uint32_t RES4[56];
-    uint8_t  IPR[240];
-    uint32_t RES5[644];
-    uint32_t STIR;
-} volatile *const NVIC = ((void *) 0xE000E100);
+	word_t reversed0[(0xe000e010-0xe0000000)/sizeof(word_t)];
+	union {
+		struct {
+			uint32_t CSR;
+			uint32_t RVR;
+			uint32_t CVR;
+			uint32_t CALIB;
+		} REGs;
+	} SYSTICK;
+	word_t reversed1[(0xe000e100-0xe000e020)/sizeof(word_t)];
+	union {
+		struct {
+			uint32_t ISER[8];
+			uint32_t RES0[24];
+			uint32_t ICER[8];
+			uint32_t RES1[24];
+			uint32_t ISPR[8];
+			uint32_t RES2[24];
+			uint32_t ICPR[8];
+			uint32_t RES3[24];
+			uint32_t IABR[8];
+			uint32_t RES4[56];
+			uint8_t  IPR[240];
+			uint32_t RES5[644];
+			uint32_t STIR;
+		} REGs;
+	} NVIC;
+} volatile *const M3PHR = ((void *) 0xE000E100);
 
 enum IRQs {
     IRQ_DMA1CHN2  = 12,
@@ -208,6 +222,7 @@ enum IRQs {
 };
 
 int  main(void);
+void handler_systick(void);
 void handler_dma1chn2(void);
 void handler_tim2(void);
 void handler_usart1(void);
@@ -228,7 +243,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
     0,                  // 0x0000_0030
     0,                  // 0x0000_0034
     0,                  // 0x0000_0038
-    0,                  // 0x0000_003C System tick timer
+    handler_systick,    // 0x0000_003C System tick timer
     0,                  // 0x0000_0040
     0,                  // 0x0000_0044
     0,                  // 0x0000_0048
@@ -270,6 +285,11 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
     0,                  // 0x0000_00D8
     0,                  // 0x0000_00DC
 };
+
+void handler_systick(void)
+{
+//  DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+}
 
 void handler_dma1chn2(void)
 {
@@ -347,6 +367,18 @@ int main(void)
 
     DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);                   // Select PLL clock as the system clock
     while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));         // Wait for PLL clock to be selected
+
+	// SYSTICK Code
+    DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
+
+    DEVMAP->GPIOs[GPIOC].REGs.CRL = 0x33333333;             // Make low GPIOC output
+    DEVMAP->GPIOs[GPIOC].REGs.CRH = 0x33333333;             // Make high GPIOC output
+
+    M3PHR->SYSTICK.REGs.CSR  = 0x00000;                     // Clear register, set to run at AHB/8 -> 1 Mhz
+    M3PHR->SYSTICK.REGs.CSR |= (1 << 1);                    // Enable interrupt
+    M3PHR->SYSTICK.REGs.RVR = M3PHR->SYSTICK.REGs.CALIB*100; // Load CALIB value * 100, 10 ms * 100 = 1 s
+    M3PHR->SYSTICK.REGs.CSR |= (1 << 0);                    // Enable SysTick
+    M3PHR->SYSTICK.REGs.CVR = 0;                            // Clear register to start
 
 	// DMA code
     DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
