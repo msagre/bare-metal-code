@@ -38,7 +38,9 @@ typedef union {
     uint8_t  byte[4];
     uint16_t hword[2];
     uint32_t word;
-} page[0x400/sizeof(uint32_t)];
+} word_t;
+
+typedef word_t page[0x400/sizeof(uint32_t)];
 
 // Memory map
 
@@ -50,70 +52,81 @@ enum {CHN1  = 0, CHN2  = 1, CHN3  = 2, CHN4  = 3, CHN5  = 4, CHN6  = 5, CHN7 = 6
 struct {
     union {
         struct {
-            uint32_t CR1;       
-            uint32_t CR2;       
-            uint32_t SMCR;      
-            uint32_t DIER;      
-            uint32_t SR;        
-            uint32_t EGR;       
-            uint32_t CCMR1;     
-            uint32_t CCMR2;     
-            uint32_t CCER;      
-            uint32_t CNT;       
-            uint32_t PSC;       
-            uint32_t ARR;       
-            uint32_t RES1;      
-            uint32_t CCR1;      
-            uint32_t CCR2;      
-            uint32_t CCR3;      
-            uint32_t CCR4;      
-            uint32_t BDTR;      
-            uint32_t DCR;       
-            uint32_t DMAR;      
+            uint32_t CR1;
+            uint32_t CR2;
+            uint32_t SMCR;
+            uint32_t DIER;
+            uint32_t SR;
+            uint32_t EGR;
+            uint32_t CCMR1;
+            uint32_t CCMR2;
+            uint32_t CCER;
+            uint32_t CNT;
+            uint32_t PSC;
+            uint32_t ARR;
+            uint32_t RES1;
+            uint32_t CCR1;
+            uint32_t CCR2;
+            uint32_t CCR3;
+            uint32_t CCR4;
+            uint32_t BDTR;
+            uint32_t DCR;
+            uint32_t DMAR;
         } REGs;
         page reserved;
     } TIMs[3];
 
-    page reserved1[(0x40002800-0x40000c00)/sizeof(page)];
+    word_t reserved1[(0x40002800-0x40000c00)/sizeof(word_t)];
     page RTC;
     page WWDG;
     page IWDG;
-    page reserved2[(0x40003800-0x40003400)/sizeof(page)];
+    word_t reserved2[(0x40003800-0x40003400)/sizeof(word_t)];
     page SPI2;
-    page reserved3[(0x40004400-0x40003c00)/sizeof(page)];
+    word_t reserved3[(0x40004400-0x40003c00)/sizeof(word_t)];
     page USART[2];
-    page reserved4[(0x40005400-0x40004c00)/sizeof(page)];
+    word_t reserved4[(0x40005400-0x40004c00)/sizeof(word_t)];
     page I2C[2];
     page USB;
     page USBCAN_SRAM;
     page bxCAN;
-    page reserved5[(0x40006c00-0x40006800)/sizeof(page)];
+    word_t reserved5[(0x40006c00-0x40006800)/sizeof(word_t)];
     page BKP;
     page PWR;
-    page reserved6[(0x40010000-0x40007400)/sizeof(page)];
-    
+    word_t reserved6[(0x40010000-0x40007400)/sizeof(word_t)];
+
     page AFIO;
     page EXTI;
 
     union {
         struct {
-            uint32_t CRL;     
-            uint32_t CRH;     
-            uint32_t IDR;     
-            uint32_t ODR;     
-            uint32_t BSRR;    
-            uint32_t BRR;     
-            uint32_t LCKR;    
+            uint32_t CRL;
+            uint32_t CRH;
+            uint32_t IDR;
+            uint32_t ODR;
+            uint32_t BSRR;
+            uint32_t BRR;
+            uint32_t LCKR;
         } REGs;
         page reserved;
     } GPIOs[5];
-    page reserved7[(0x40012400-0x40011C00)/sizeof(page)];
+    word_t reserved7[(0x40012400-0x40011C00)/sizeof(word_t)];
     page ADC[2];
     page TIM1;
     page SPI1;
-    page reserved8[(0x40013800-0x40013400)/sizeof(page)];
-    page USART1;
-    page reserved9[(0x40020000-0x40013C00)/sizeof(page)];
+    word_t reserved8[(0x40013800-0x40013400)/sizeof(word_t)];
+	union  {
+		struct {
+			uint32_t SR;
+			uint32_t DR;
+			uint32_t BRR;
+			uint32_t CR1;
+			uint32_t CR2;
+			uint32_t CR3;
+			uint32_t GTPR;
+		} REGs;
+		page reserved;
+	} USART1;
+    word_t reserved9[(0x40020000-0x40013C00)/sizeof(word_t)];
     union {
         struct {
             uint32_t ISR;
@@ -128,22 +141,22 @@ struct {
         } REGs;
         page reserved;
     } DMAs[1];
-    page reservedA[(0x40021000-0x40020400)/sizeof(page)];
+    word_t reservedA[(0x40021000-0x40020400)/sizeof(word_t)];
 
     union {
         struct {
-            uint32_t CR;      
-            uint32_t CFGR;    
-            uint32_t CIR;     
+            uint32_t CR;
+            uint32_t CFGR;
+            uint32_t CIR;
             uint32_t APB2RSTR;
             uint32_t APB1RSTR;
-            uint32_t AHBENR;  
-            uint32_t APB2ENR; 
-            uint32_t APB1ENR; 
-            uint32_t BDCR;    
-            uint32_t CSR;     
-            uint32_t AHBRSTR; 
-            uint32_t CFGR2;   
+            uint32_t AHBENR;
+            uint32_t APB2ENR;
+            uint32_t APB1ENR;
+            uint32_t BDCR;
+            uint32_t CSR;
+            uint32_t AHBRSTR;
+            uint32_t CFGR2;
         } REGs;
         page reserved;
     } RCC;
@@ -155,76 +168,89 @@ struct {
 #define CLR_IRQ(IRQ) {NVIC->ICPR[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
 
 struct {
-    uint32_t ISER[8]; 
-    uint32_t RES0[24]; 
-    uint32_t ICER[8]; 
-    uint32_t RES1[24]; 
-    uint32_t ISPR[8]; 
-    uint32_t RES2[24]; 
-    uint32_t ICPR[8]; 
-    uint32_t RES3[24]; 
-    uint32_t IABR[8]; 
-    uint32_t RES4[56]; 
-    uint8_t  IPR[240]; 
-    uint32_t RES5[644]; 
+    uint32_t ISER[8];
+    uint32_t RES0[24];
+    uint32_t ICER[8];
+    uint32_t RES1[24];
+    uint32_t ISPR[8];
+    uint32_t RES2[24];
+    uint32_t ICPR[8];
+    uint32_t RES3[24];
+    uint32_t IABR[8];
+    uint32_t RES4[56];
+    uint8_t  IPR[240];
+    uint32_t RES5[644];
     uint32_t STIR;
 } volatile *const NVIC = ((void *) 0xE000E100);
 
 enum IRQs {
-    IRQ_DMA1CHN2  = 12,     // DMA1 Channel 2 global Interrupt                     
-    IRQ_TIM2      = 28,     // TIM2 global Interrupt                               
+    IRQ_DMA1CHN2  = 12,
+    IRQ_TIM2      = 28,
+    IRQ_USART1    = 37,
 };
 
 int  main(void);
 void handler_dma1chn2(void);
 void handler_tim2(void);
+void handler_usart1(void);
 
-const interrupt_t vector_table[] __attribute__ ((section(".vectors"))) = {
-    STACKINIT,          // 0x000 Stack Pointer
-    (interrupt_t) main, // 0x004 Reset                 
-    0,                  // 0x008
-    0,                  // 0x00C
-    0,                  // 0x010
-    0,                  // 0x014
-    0,                  // 0x018
-    0,                  // 0x01C
-    0,                  // 0x020
-    0,                  // 0x024
-    0,                  // 0x028
-    0,                  // 0x02C
-    0,                  // 0x030
-    0,                  // 0x034
-    0,                  // 0x038
-    0,                  // 0x03C System tick timer     
-    0,                  // 0x040
-    0,                  // 0x044
-    0,                  // 0x048
-    0,                  // 0x04C
-    0,                  // 0x050
-    0,                  // 0x054
-    0,                  // 0x058
-    0,                  // 0x05C
-    0,                  // 0x060
-    0,                  // 0x064
-    0,                  // 0x068
-    0,                  // 0x06C
-    handler_dma1chn2,   // 0x070 DMA1_CHN2    
-    0,                  // 0x074
-    0,                  // 0x078
-    0,                  // 0x07C
-    0,                  // 0x080
-    0,                  // 0x084
-    0,                  // 0x088
-    0,                  // 0x08C
-    0,                  // 0x090
-    0,                  // 0x094
-    0,                  // 0x098
-    0,                  // 0x09C
-    0,                  // 0x0A0
-    0,                  // 0x0A4
-    0,                  // 0x0A8
-    0,                  // 0x0AC
-    handler_tim2,       // 0x0B0 TIM2        
+const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
+    STACKINIT,          // 0x0000_0000 Stack Pointer
+    (interrupt_t) main, // 0x0000_0004 Reset
+    0,                  // 0x0000_0008
+    0,                  // 0x0000_000C
+    0,                  // 0x0000_0010
+    0,                  // 0x0000_0014
+    0,                  // 0x0000_0018
+    0,                  // 0x0000_001C
+    0,                  // 0x0000_0020
+    0,                  // 0x0000_0024
+    0,                  // 0x0000_0028
+    0,                  // 0x0000_002C
+    0,                  // 0x0000_0030
+    0,                  // 0x0000_0034
+    0,                  // 0x0000_0038
+    0,                  // 0x0000_003C System tick timer
+    0,                  // 0x0000_0040
+    0,                  // 0x0000_0044
+    0,                  // 0x0000_0048
+    0,                  // 0x0000_004C
+    0,                  // 0x0000_0050
+    0,                  // 0x0000_0054
+    0,                  // 0x0000_0058
+    0,                  // 0x0000_005C
+    0,                  // 0x0000_0060
+    0,                  // 0x0000_0064
+    0,                  // 0x0000_0068
+    0,                  // 0x0000_006C
+    handler_dma1chn2,   // 0x0000_0070 DMA1_CHN2
+    0,                  // 0x0000_0074
+    0,                  // 0x0000_0078
+    0,                  // 0x0000_007C
+    0,                  // 0x0000_0080
+    0,                  // 0x0000_0084
+    0,                  // 0x0000_0088
+    0,                  // 0x0000_008C
+    0,                  // 0x0000_0090
+    0,                  // 0x0000_0094
+    0,                  // 0x0000_0098
+    0,                  // 0x0000_009C
+    0,                  // 0x0000_00A0
+    0,                  // 0x0000_00A4
+    0,                  // 0x0000_00A8
+    0,                  // 0x0000_00AC
+    handler_tim2,       // 0x0000_00B0 TIM2
+    0,                  // 0x0000_00B4
+    0,                  // 0x0000_00B8
+    0,                  // 0x0000_00BC
+    0,                  // 0x0000_00C0
+    0,                  // 0x0000_00C4
+    0,                  // 0x0000_00C8
+    0,                  // 0x0000_00CC
+    0,                  // 0x0000_00D0
+    handler_usart1,     // 0x0000_00D4
+    0,                  // 0x0000_00D8
+    0,                  // 0x0000_00DC
 };
 
 void handler_dma1chn2(void)
@@ -240,6 +266,15 @@ void handler_tim2(void)
 //  DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
     DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
     CLR_IRQ(IRQ_TIM2);
+}
+
+void handler_usart1(void)
+{
+//  DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+	if (DEVMAP->USART1.REGs.SR & (1 << 5)) {
+		DEVMAP->USART1.REGs.DR = DEVMAP->USART1.REGs.DR;
+	}
+    CLR_IRQ(IRQ_USART1);
 }
 
 // One cycle first order sigma delta sin signal
@@ -284,12 +319,12 @@ int main(void)
     while (!(DEVMAP->RCC.REGs.CR & (1 << 17)));             // Wait for HSE is locked
 
     DEVMAP->RCC.REGs.CR   &= ~(1 << 24);                    // Disable PLL
-    DEVMAP->RCC.REGs.CFGR |= (0b0100 << 18);                // Set PLLMULL to 6. Set PLL output clock to 48 Mhz 
+    DEVMAP->RCC.REGs.CFGR |= (0b0100 << 18);                // Set PLLMULL to 6. Set PLL output clock to 48 Mhz
     DEVMAP->RCC.REGs.CFGR |=  (1 << 16);                    // Select HSE as the PLL source clock
     DEVMAP->RCC.REGs.CR   |=  (1 << 24);                    // Enable PLL
     while (!(DEVMAP->RCC.REGs.CR & (1 << 25)));             // Wait for PLL is locked
 
-    DEVMAP->RCC.REGs.CFGR |= (0b1000 << 4);                 // Set AHB HPRE division to 2. Set AHB clock to 24 Mhz 
+    DEVMAP->RCC.REGs.CFGR |= (0b1000 << 4);                 // Set AHB HPRE division to 2. Set AHB clock to 24 Mhz
 
     DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);                   // Select PLL clock as the system clock
     while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));         // Wait for PLL clock to be selected
@@ -298,8 +333,8 @@ int main(void)
     DEVMAP->RCC.REGs.APB1ENR |= (1 << 0);                   // Enable TIM2 clock.
     DEVMAP->RCC.REGs.AHBENR  |= (1 << 0);                   // Enable DMA1 clock.
 
-    DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x22222222;            // Make low GPIOC output
-    DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x22222222;            // Make high GPIOC output
+    DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;            // Make low GPIOC output
+    DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;            // Make high GPIOC output
     DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
 
     DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CNDTR = sizeof(data)/sizeof(uint32_t); // Transfer size
@@ -333,7 +368,18 @@ int main(void)
 
     DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 0);               // Finally enable TIM1 module
 
-    for(;;);
+	DEVMAP->GPIOs[GPIOA].REGs.CRH &= 0xFFFFF00F;
+	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x00000BB0;			// CNF alternate function push pull, max speed 50 MHz
+
+	DEVMAP->USART1.REGs.CR1 |= (1 << 13);                   // Enable USART1
+	DEVMAP->USART1.REGs.CR1 |= (0 << 12);                   // Word length - leave default (8 data)
+	DEVMAP->USART1.REGs.CR2 |= (0b00 << 12);                // Number of stop bits - leave default (1 stop)
+	DEVMAP->USART1.REGs.BRR =  0x1388;                      // Set BRR to (48 Mhz/9600 bdps) = 5000 = 0x1388
+	DEVMAP->USART1.REGs.CR1 |= (1 << 3);                    // Transmitter enable
+	DEVMAP->USART1.REGs.CR1 |= (1 << 2);                    // Receiver enable
+	DEVMAP->USART1.REGs.CR1 |= (1 << 5);                    // RXNE interrupt enable
+
+	for(;;);
 
     return 0;
 }
