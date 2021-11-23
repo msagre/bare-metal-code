@@ -213,10 +213,11 @@ struct {
 			uint32_t STIR;
 		} REGs;
 	} NVIC;
-} volatile *const M3PHR = ((void *) 0xE000E100);
+} volatile *const M3PHR = ((void *) 0xE0000000);
 
 enum IRQs {
     IRQ_DMA1CHN2  = 12,
+    IRQ_ADC1_2    = 18,
     IRQ_TIM2      = 28,
     IRQ_USART1    = 37,
 };
@@ -224,6 +225,7 @@ enum IRQs {
 int  main(void);
 void handler_systick(void);
 void handler_dma1chn2(void);
+void handler_adc1_2(void);
 void handler_tim2(void);
 void handler_usart1(void);
 
@@ -262,7 +264,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
     0,                  // 0x0000_007C
     0,                  // 0x0000_0080
     0,                  // 0x0000_0084
-    0,                  // 0x0000_0088
+    handler_adc1_2,     // 0x0000_0088
     0,                  // 0x0000_008C
     0,                  // 0x0000_0090
     0,                  // 0x0000_0094
@@ -286,9 +288,11 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
     0,                  // 0x0000_00DC
 };
 
+uint32_t tick;
+uint32_t tock;
 void handler_systick(void)
 {
-//  DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+	tick = !tock;
 }
 
 void handler_dma1chn2(void)
@@ -299,19 +303,27 @@ void handler_dma1chn2(void)
     CLR_IRQ(IRQ_DMA1CHN2);
 }
 
+uint32_t adc1_2_rdy;
+uint32_t adc1_2_req;
+void handler_adc1_2(void)
+{
+	adc1_2_rdy = adc1_2_req;
+	DEVMAP->ADC[ADC1].REGs.SR &= ~(1 << 1);					// Clear EOC bit
+    CLR_IRQ(IRQ_ADC1_2);
+}
+
 void handler_tim2(void)
 {
-//  DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
     DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
     CLR_IRQ(IRQ_TIM2);
 }
 
+uint32_t tx_rdy;
+uint32_t tx_req;
 void handler_usart1(void)
 {
-//  DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
-	if (DEVMAP->USART1.REGs.SR & (1 << 5)) {
-		DEVMAP->USART1.REGs.DR = DEVMAP->USART1.REGs.DR;
-	}
+	tx_rdy = tx_req;
+	DEVMAP->USART1.REGs.CR1 &= ~(1 << 7);                    // Disable TXE Interrupt
     CLR_IRQ(IRQ_USART1);
 }
 
@@ -373,12 +385,90 @@ int main(void)
 
     DEVMAP->GPIOs[GPIOC].REGs.CRL = 0x33333333;             // Make low GPIOC output
     DEVMAP->GPIOs[GPIOC].REGs.CRH = 0x33333333;             // Make high GPIOC output
+	DEVMAP->GPIOs[GPIOC].REGs.ODR = 0;
 
-    M3PHR->SYSTICK.REGs.CSR  = 0x00000;                     // Clear register, set to run at AHB/8 -> 1 Mhz
+    M3PHR->SYSTICK.REGs.CSR  = 0x00000;                     // Clear register, set to run at AHB/8 -> 24 Mhz/8 = 3 Mhz
     M3PHR->SYSTICK.REGs.CSR |= (1 << 1);                    // Enable interrupt
-    M3PHR->SYSTICK.REGs.RVR = M3PHR->SYSTICK.REGs.CALIB*100; // Load CALIB value * 100, 10 ms * 100 = 1 s
+    M3PHR->SYSTICK.REGs.RVR = 3000000; 						// Set 1 second tick
     M3PHR->SYSTICK.REGs.CSR |= (1 << 0);                    // Enable SysTick
     M3PHR->SYSTICK.REGs.CVR = 0;                            // Clear register to start
+
+	// ADC code
+    DEVMAP->RCC.REGs.CFGR |= (0b00 << 14);                  // Set ADC prescaler to 4
+    DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
+
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);                   // Enable ADC clock
+	DEVMAP->GPIOs[GPIOC].REGs.CRL &= 0xFF00FFFF;			// Set PC5 and PC4 as analog input for ADC channel 15 and 14 respectively
+
+	DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);         		// Set ADC ON state
+	DEVMAP->ADC[ADC1].REGs.CR1  &= ~(1 << 8);               // SCAN mode disabled
+	DEVMAP->ADC[ADC1].REGs.SQR3 &= ~0xFFFFFFFF;             // Clears whole 32bit register
+	DEVMAP->ADC[ADC1].REGs.SQR3 |= (14 << 0);               // First conversion in regular sequence
+	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 1);               // Single conversion
+	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 11);              // Right alignment
+	DEVMAP->ADC[ADC1].REGs.CR1  |= (1 << 5);                // Enable EOC Interrupt
+    ENA_IRQ(IRQ_ADC1_2);                                    // Enable ADC1_2 NVIC IRQ
+
+	// USART code
+//	DEVMAP->RCC.REGs.APB2ENR |= (1 << 2);                   // Enable GPIOA clock
+//	DEVMAP->RCC.REGs.APB2ENR |= (1 << 14);                  // Enable UART1 clock
+//
+//	DEVMAP->GPIOs[GPIOA].REGs.CRH &= 0xFFFFF00F;
+//	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x00000BB0;            // CNF alternate function push pull, max speed 50 MHz
+//
+//	DEVMAP->USART1.REGs.CR1 = 0;
+//	DEVMAP->USART1.REGs.CR1 |= (0 << 12);                   // Word length - leave default (8 data)
+//	DEVMAP->USART1.REGs.CR2 |= (0b00 << 12);                // Number of stop bits - leave default (1 stop)
+//	DEVMAP->USART1.REGs.BRR =  0x1388;                      // Set BRR to (48 Mhz/9600 bdps) = 5000 = 0x1388
+//	DEVMAP->USART1.REGs.CR1 |= (1 << 3);                    // Transmitter enable
+////	DEVMAP->USART1.REGs.CR1 |= (1 << 5);                    // RXNEIE : Enable RXNE Interrupt
+////	DEVMAP->USART1.REGs.CR1 |= (1 << 2);                    // Receiver enable
+//	DEVMAP->USART1.REGs.CR1 |= (1 << 13);                   // Enable USART1
+//    ENA_IRQ(IRQ_USART1);                                    // Enable USART1 NVIC IRQ
+
+	for(;;) {
+		bool tgr_adc;
+		bool tgr_uart;
+
+		uint8_t[4] tx_data;
+
+
+		if (tick != tock) {
+//			tx_req = !tx_rdy;
+//			DEVMAP->USART1.REGs.DR = 'a';
+//			DEVMAP->USART1.REGs.CR1 |= (1 << 7);            // TXEIE : Enable TXE Interrupt 
+			adc1_2_req = !adc1_2_rdy;
+			DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);         // Set ADC ON state
+			tock = tick;
+			tgr_adc = 1;
+		}
+
+		if (adc1_2_req == adc1_2_rdy) {
+			if (tgr_adc) {
+				static const uint8_t hextab[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+				uint32_t dr;
+
+				dr = DEVMAP->ADC[ADC1].REGs.DR;
+				DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+				dst = tx_data+sizeof(tx_data);
+				while (tx_data < dst--);
+					*dst = hextab[(dr & 0xf)];
+					dr >>= 4;
+				}
+				tgr_adc = 0;
+	//			tx_req = !tx_rdy;
+			}
+		}
+
+//		if (tx_req == tx_rdy) {
+//			if (e) {
+//				DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+//				e = 0;
+//			}
+//		}
+	}
+	
+
 
 	// DMA code
     DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
@@ -420,36 +510,6 @@ int main(void)
 
     DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 0);               // Finally enable TIM1 module
 
-	// USART code
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 2);                   // Enable GPIOA clock
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 14);                  // Enable UART1 clock
-
-	DEVMAP->GPIOs[GPIOA].REGs.CRH &= 0xFFFFF00F;
-	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x00000BB0;            // CNF alternate function push pull, max speed 50 MHz
-
-	DEVMAP->USART1.REGs.CR1 |= (1 << 13);                   // Enable USART1
-	DEVMAP->USART1.REGs.CR1 |= (0 << 12);                   // Word length - leave default (8 data)
-	DEVMAP->USART1.REGs.CR2 |= (0b00 << 12);                // Number of stop bits - leave default (1 stop)
-	DEVMAP->USART1.REGs.BRR =  0x1388;                      // Set BRR to (48 Mhz/9600 bdps) = 5000 = 0x1388
-	DEVMAP->USART1.REGs.CR1 |= (1 << 3);                    // Transmitter enable
-	DEVMAP->USART1.REGs.CR1 |= (1 << 2);                    // Receiver enable
-	DEVMAP->USART1.REGs.CR1 |= (1 << 5);                    // RXNE interrupt enable
-    ENA_IRQ(IRQ_USART1);                                    // Enable USART1
-
-
-	// ADC code
-    DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
-
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);                   // Enable ADC clock
-	DEVMAP->GPIOs[GPIOC].REGs.CRL &= 0xFF00FFFF;			// Set PC5 and PC4 as analog input for ADC channel 15 and 14 respectively
-
-	DEVMAP->ADC[ADC1].REGs.CR1  &= ~(1 << 8);               // SCAN mode disabled
-	DEVMAP->ADC[ADC1].REGs.SQR3 &= ~0xFFFFFFFF;             // Clears whole 32bit register
-	DEVMAP->ADC[ADC1].REGs.SQR3 |= (14 << 0);               // First conversion in regular sequence: Temperature on ADC1_In18
-	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 1);               // Single conversion
-	DEVMAP->ADC[ADC1].REGs.CR2  &= ~(1 << 11);              // Right alignment
-	DEVMAP->ADC[ADC1].REGs.CR1  |= ~(1 << 5);               // Enable EOC Interrupt
-	DEVMAP->ADC[ADC1].REGs.CR1  |= ~(1 << 0);               // Set ADC ON state
 
 	for(;;);
 
