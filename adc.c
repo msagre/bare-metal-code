@@ -1,3 +1,4 @@
+// vi: ts=4 shiftwidth=4
 //																			  //
 // Author(s):																  //
 //	 Miguel Angel Sagreras													  //
@@ -181,9 +182,9 @@ struct {
 
 } volatile *const DEVMAP = (void *) 0x40000000;
 
-#define ENA_IRQ(IRQ) {M3PHR->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
-#define DIS_IRQ(IRQ) {M3PHR->NVIC.REGs.ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
-#define CLR_IRQ(IRQ) {M3PHR->NVIC.REGs.ICPR[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define ENA_IRQ(IRQ) {CTX->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define DIS_IRQ(IRQ) {CTX->NVIC.REGs.ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define CLR_IRQ(IRQ) {CTX->NVIC.REGs.ICPR[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
 
 struct {
 	word_t reversed0[(0xe000e010-0xe0000000)/sizeof(word_t)];
@@ -213,7 +214,7 @@ struct {
 			uint32_t STIR;
 		} REGs;
 	} NVIC;
-} volatile *const M3PHR = ((void *) 0xE0000000);
+} volatile *const CTX = ((void *) 0xE0000000);
 
 enum IRQs {
 	IRQ_ADC1_2	  = 18,
@@ -334,11 +335,11 @@ int main(void)
 	DEVMAP->GPIOs[GPIOC].REGs.CRH = 0x33333333;				// Make high GPIOC output
 	DEVMAP->GPIOs[GPIOC].REGs.ODR = 0;
 
-	M3PHR->SYSTICK.REGs.CSR  = 0x00000;						// Clear register, set to run at AHB/8 -> 24 Mhz/8 = 3 Mhz
-	M3PHR->SYSTICK.REGs.CSR |= (1 << 1);					// Enable interrupt
-	M3PHR->SYSTICK.REGs.RVR = 3000000;						// Set 1 second tick
-	M3PHR->SYSTICK.REGs.CSR |= (1 << 0);					// Enable SysTick
-	M3PHR->SYSTICK.REGs.CVR = 0;							// Clear register to start
+	CTX->SYSTICK.REGs.CSR  = 0x00000;						// Clear register, set to run at AHB/8 -> 24 Mhz/8 = 3 Mhz
+	CTX->SYSTICK.REGs.CSR |= (1 << 1);						// Enable interrupt
+	CTX->SYSTICK.REGs.RVR = 3000000;						// Set 1 second tick
+	CTX->SYSTICK.REGs.CSR |= (1 << 0);						// Enable SysTick
+	CTX->SYSTICK.REGs.CVR = 0;								// Clear register to start
 
 	// ADC code
 	DEVMAP->RCC.REGs.CFGR |= (0b00 << 14);					// Set ADC prescaler to 4

@@ -1,3 +1,4 @@
+// vi: ts=4 shiftwidth=4
 //																			  //
 // Author(s):																  //
 //	 Miguel Angel Sagreras													  //
@@ -181,9 +182,9 @@ struct {
 
 } volatile *const DEVMAP = (void *) 0x40000000;
 
-#define ENA_IRQ(IRQ) {M3PHR->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
-#define DIS_IRQ(IRQ) {M3PHR->NVIC.REGs.ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
-#define CLR_IRQ(IRQ) {M3PHR->NVIC.REGs.ICPR[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define ENA_IRQ(IRQ) {CTX->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define DIS_IRQ(IRQ) {CTX->NVIC.REGs.ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
+#define CLR_IRQ(IRQ) {CTX->NVIC.REGs.ICPR[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
 
 struct {
 	word_t reversed0[(0xe000e010-0xe0000000)/sizeof(word_t)];
@@ -213,7 +214,7 @@ struct {
 			uint32_t STIR;
 		} REGs;
 	} NVIC;
-} volatile *const M3PHR = ((void *) 0xE0000000);
+} volatile *const CTX = ((void *) 0xE0000000);
 
 enum IRQs {
 	IRQ_DMA1CHN2  = 12,
@@ -245,7 +246,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,					// 0x0000_0030
 	0,					// 0x0000_0034
 	0,					// 0x0000_0038
-	handler_systick,	// 0x0000_003C System tick timer
+	0,					// 0x0000_003C
 	0,					// 0x0000_0040
 	0,					// 0x0000_0044
 	0,					// 0x0000_0048
@@ -264,7 +265,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,					// 0x0000_007C
 	0,					// 0x0000_0080
 	0,					// 0x0000_0084
-	handler_adc1_2,		// 0x0000_0088
+	0,					// 0x0000_0088
 	0,					// 0x0000_008C
 	0,					// 0x0000_0090
 	0,					// 0x0000_0094
@@ -275,25 +276,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,					// 0x0000_00A8
 	0,					// 0x0000_00AC
 	handler_tim2,		// 0x0000_00B0 TIM2
-	0,					// 0x0000_00B4
-	0,					// 0x0000_00B8
-	0,					// 0x0000_00BC
-	0,					// 0x0000_00C0
-	0,					// 0x0000_00C4
-	0,					// 0x0000_00C8
-	0,					// 0x0000_00CC
-	0,					// 0x0000_00D0
-	handler_usart1,		// 0x0000_00D4
-	0,					// 0x0000_00D8
-	0,					// 0x0000_00DC
 };
-
-uint32_t tick;
-uint32_t tock;
-void handler_systick(void)
-{
-	tick = !tock;
-}
 
 void handler_dma1chn2(void)
 {
@@ -303,28 +286,10 @@ void handler_dma1chn2(void)
 	CLR_IRQ(IRQ_DMA1CHN2);
 }
 
-uint32_t adc1_2_rdy;
-uint32_t adc1_2_req;
-void handler_adc1_2(void)
-{
-	adc1_2_rdy = adc1_2_req;
-	DEVMAP->ADC[ADC1].REGs.SR &= ~(1 << 1);					// Clear EOC bit
-	CLR_IRQ(IRQ_ADC1_2);
-}
-
 void handler_tim2(void)
 {
 	DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
 	CLR_IRQ(IRQ_TIM2);
-}
-
-uint32_t tx_rdy;
-uint32_t tx_req;
-void handler_usart1(void)
-{
-	tx_rdy = tx_req;
-	DEVMAP->USART1.REGs.CR1 &= ~(1 << 7);					 // Disable TXE Interrupt
-	CLR_IRQ(IRQ_USART1);
 }
 
 // One cycle first order sigma delta sin signal
