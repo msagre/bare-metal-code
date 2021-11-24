@@ -382,10 +382,8 @@ int main(void)
 		uint8_t tx_data[6];
 		uint8_t *tx_ptr = tx_data;
 
-		tock	   = tick;
-		tx_req	   = tx_rdy;
-		adc1_2_req = adc1_2_rdy;
 
+		tock	   = tick;
 		tx_data[4] = '\r';
 		tx_data[5] = '\n';
 
@@ -413,8 +411,9 @@ int main(void)
 						*dst = hextab[(dr & 0xf)];
 						dr >>= 4;
 					}
-					state = S_TXDATA;
+					tx_req = tx_rdy;
 					tx_ptr = tx_data;
+					state = S_TXDATA;
 				}
 				break;
 			case S_TXDATA:
