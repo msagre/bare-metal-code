@@ -364,6 +364,9 @@ uint32_t const data[256] = {
 
 int main(void)
 {
+	enum states { S_SYSTICK, S_ADC, S_TXDATA };
+	enum states state;
+	uint8_t *tx_ptr;
 
 	// PCLK code
     DEVMAP->RCC.REGs.CR   |= (1 << 16);                     // Enable HSE
@@ -410,62 +413,66 @@ int main(void)
     ENA_IRQ(IRQ_ADC1_2);                                    // Enable ADC1_2 NVIC IRQ
 
 	// USART code
-//	DEVMAP->RCC.REGs.APB2ENR |= (1 << 2);                   // Enable GPIOA clock
-//	DEVMAP->RCC.REGs.APB2ENR |= (1 << 14);                  // Enable UART1 clock
-//
-//	DEVMAP->GPIOs[GPIOA].REGs.CRH &= 0xFFFFF00F;
-//	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x00000BB0;            // CNF alternate function push pull, max speed 50 MHz
-//
-//	DEVMAP->USART1.REGs.CR1 = 0;
-//	DEVMAP->USART1.REGs.CR1 |= (0 << 12);                   // Word length - leave default (8 data)
-//	DEVMAP->USART1.REGs.CR2 |= (0b00 << 12);                // Number of stop bits - leave default (1 stop)
-//	DEVMAP->USART1.REGs.BRR =  0x1388;                      // Set BRR to (48 Mhz/9600 bdps) = 5000 = 0x1388
-//	DEVMAP->USART1.REGs.CR1 |= (1 << 3);                    // Transmitter enable
-////	DEVMAP->USART1.REGs.CR1 |= (1 << 5);                    // RXNEIE : Enable RXNE Interrupt
-////	DEVMAP->USART1.REGs.CR1 |= (1 << 2);                    // Receiver enable
-//	DEVMAP->USART1.REGs.CR1 |= (1 << 13);                   // Enable USART1
-//    ENA_IRQ(IRQ_USART1);                                    // Enable USART1 NVIC IRQ
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 2);                   // Enable GPIOA clock
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 14);                  // Enable UART1 clock
 
+	DEVMAP->GPIOs[GPIOA].REGs.CRH &= 0xFFFFF00F;
+	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x00000BB0;            // CNF alternate function push pull, max speed 50 MHz
+
+	DEVMAP->USART1.REGs.CR1 = 0;
+	DEVMAP->USART1.REGs.CR1 |= (0 << 12);                   // Word length - leave default (8 data)
+	DEVMAP->USART1.REGs.CR2 |= (0b00 << 12);                // Number of stop bits - leave default (1 stop)
+	DEVMAP->USART1.REGs.BRR =  0x1388;                      // Set BRR to (48 Mhz/9600 bdps) = 5000 = 0x1388
+	DEVMAP->USART1.REGs.CR1 |= (1 << 3);                    // Transmitter enable
+//	DEVMAP->USART1.REGs.CR1 |= (1 << 5);                    // RXNEIE : Enable RXNE Interrupt
+//	DEVMAP->USART1.REGs.CR1 |= (1 << 2);                    // Receiver enable
+	DEVMAP->USART1.REGs.CR1 |= (1 << 13);                   // Enable USART1
+    ENA_IRQ(IRQ_USART1);                                    // Enable USART1 NVIC IRQ
+
+	tock       = tick;
+	tx_req     = tx_rdy;
+	adc1_2_req = adc1_2_rdy;
+	state = S_SYSTICK;
 	for(;;) {
-		bool tgr_adc;
-		bool tgr_uart;
+		uint8_t tx_data[4];
 
-		uint8_t[4] tx_data;
-
-
-		if (tick != tock) {
-//			tx_req = !tx_rdy;
-//			DEVMAP->USART1.REGs.DR = 'a';
-//			DEVMAP->USART1.REGs.CR1 |= (1 << 7);            // TXEIE : Enable TXE Interrupt 
-			adc1_2_req = !adc1_2_rdy;
-			DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);         // Set ADC ON state
-			tock = tick;
-			tgr_adc = 1;
-		}
-
-		if (adc1_2_req == adc1_2_rdy) {
-			if (tgr_adc) {
+		switch (state) {
+		case S_SYSTICK :
+			if (tick != tock) {
+				DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);     // Set ADC ON state
+				tock = tick;
+				adc1_2_req = !adc1_2_rdy;
+				state = S_ADC;
+			}
+			break;
+		case S_ADC:
+			if (adc1_2_req == adc1_2_rdy) {
 				static const uint8_t hextab[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 				uint32_t dr;
+				uint8_t *dst;
 
-				dr = DEVMAP->ADC[ADC1].REGs.DR;
-				DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+				dr  = DEVMAP->ADC[ADC1].REGs.DR;
 				dst = tx_data+sizeof(tx_data);
-				while (tx_data < dst--);
+				while (tx_data < dst--) {
 					*dst = hextab[(dr & 0xf)];
 					dr >>= 4;
 				}
-				tgr_adc = 0;
-	//			tx_req = !tx_rdy;
+				state = S_TXDATA;
+				tx_ptr = tx_data;
+			}
+			break;
+		case S_TXDATA:
+			if (tx_ptr < tx_data+sizeof(tx_data)) {
+				if (tx_req == tx_rdy) {
+					tx_req = !tx_rdy;
+					DEVMAP->USART1.REGs.DR = *tx_ptr++;
+					DEVMAP->USART1.REGs.CR1 |= (1 << 7);    // TXEIE : Enable TXE Interrupt 
+				}
+			} else {
+				DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+				state = S_SYSTICK;
 			}
 		}
-
-//		if (tx_req == tx_rdy) {
-//			if (e) {
-//				DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
-//				e = 0;
-//			}
-//		}
 	}
 	
 
