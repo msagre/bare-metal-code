@@ -216,17 +216,13 @@ struct {
 } volatile *const M3PHR = ((void *) 0xE0000000);
 
 enum IRQs {
-	IRQ_DMA1CHN2  = 12,
 	IRQ_ADC1_2	  = 18,
-	IRQ_TIM2	  = 28,
 	IRQ_USART1	  = 37,
 };
 
 int  main(void);
 void handler_systick(void);
-void handler_dma1chn2(void);
 void handler_adc1_2(void);
-void handler_tim2(void);
 void handler_usart1(void);
 
 const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
@@ -258,7 +254,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,					// 0x0000_0064
 	0,					// 0x0000_0068
 	0,					// 0x0000_006C
-	handler_dma1chn2,	// 0x0000_0070 DMA1_CHN2
+	0,					// 0x0000_0070
 	0,					// 0x0000_0074
 	0,					// 0x0000_0078
 	0,					// 0x0000_007C
@@ -274,7 +270,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,					// 0x0000_00A4
 	0,					// 0x0000_00A8
 	0,					// 0x0000_00AC
-	handler_tim2,		// 0x0000_00B0 TIM2
+	0,					// 0x0000_00B0 TIM2
 	0,					// 0x0000_00B4
 	0,					// 0x0000_00B8
 	0,					// 0x0000_00BC
@@ -283,7 +279,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,					// 0x0000_00C8
 	0,					// 0x0000_00CC
 	0,					// 0x0000_00D0
-	handler_usart1,		// 0x0000_00D4
+	handler_usart1,		// 0x0000_00D4 USART1
 	0,					// 0x0000_00D8
 	0,					// 0x0000_00DC
 };
@@ -295,14 +291,6 @@ void handler_systick(void)
 	tick = !tock;
 }
 
-void handler_dma1chn2(void)
-{
-
-//	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
-	DEVMAP->DMAs[DMA1].REGs.IFCR |= (0xf << 1);
-	CLR_IRQ(IRQ_DMA1CHN2);
-}
-
 volatile uint32_t adc1_2_rdy;
 volatile uint32_t adc1_2_req;
 void handler_adc1_2(void)
@@ -310,12 +298,6 @@ void handler_adc1_2(void)
 	adc1_2_rdy = adc1_2_req;
 	DEVMAP->ADC[ADC1].REGs.SR &= ~(1 << 1);					// Clear EOC bit
 	CLR_IRQ(IRQ_ADC1_2);
-}
-
-void handler_tim2(void)
-{
-	DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
-	CLR_IRQ(IRQ_TIM2);
 }
 
 volatile uint32_t tx_rdy;
@@ -326,41 +308,6 @@ void handler_usart1(void)
 	DEVMAP->USART1.REGs.CR1 &= ~(1 << 7);					 // Disable TXE Interrupt
 	CLR_IRQ(IRQ_USART1);
 }
-
-// One cycle first order sigma delta sin signal
-uint32_t const data[256] = {
-	0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000,
-	0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000,
-	0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00000000,
-	0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000,
-	0x00002000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00002000,
-	0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00002000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00002000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000};
 
 int main(void)
 {
@@ -484,49 +431,5 @@ int main(void)
 		}
 	}
 	
-
-	// DMA code
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
-	DEVMAP->RCC.REGs.APB1ENR |= (1 << 0);					// Enable TIM2 clock.
-	DEVMAP->RCC.REGs.AHBENR  |= (1 << 0);					// Enable DMA1 clock.
-
-	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;			// Make low GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;			// Make high GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
-
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CNDTR = sizeof(data)/sizeof(uint32_t); // Transfer size
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CMAR	= (uint32_t) data;				 // Memory source address
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CPAR	= (uint32_t) &DEVMAP->GPIOs[GPIOC].REGs.ODR; // Peripheral destination address
-
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR  = 0;				// Reset CCR
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR &= ~(1 << 14);	// Disable memory to memory transfer on DMA1 channel 2
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (0b11 << 12); // Set DMA priority to very high
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (0b10 << 10); // Set memory transfer size to 32-bits
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (0b10 << 8);	// Set peripheral transfer size to 32-bits
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 7);		// Enable memory increment mode
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR &= ~(1 << 6);		// Disable peripheral increment mode
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 5);		// Enable circular mode
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 4);		// Read from memory
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 2);		// Enable half transfer completed interrupt
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 1);		// Enable transfer completed interrupt
-	ENA_IRQ(IRQ_DMA1CHN2);									// Enable DMA1 Channel2 inturrupt on NVIC
-
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |= (1 << 0);		// Enable DMA
-
-	ENA_IRQ(IRQ_TIM2);										// Enable TIM2 interrupt on NVIC
-	DEVMAP->TIMs[TIM2].REGs.CR1  = 0x0000;					// Reset CR1 just in case
-//	DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 4);				// Down counter mode
-	DEVMAP->TIMs[TIM2].REGs.PSC   = 46874;					// fCK_PSC / (PSC[15:0] + 1)
-	DEVMAP->TIMs[TIM2].REGs.ARR   = 1;
-	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 << 14);				// Trigger DMA request enable
-	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  8);				// Update DMA request enable
-//	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  6);				// Enable interrupt
-//	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  0);				// Update interrupt enable
-
-	DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 0);				// Finally enable TIM1 module
-
-
-	for(;;);
-
 	return 0;
 }
