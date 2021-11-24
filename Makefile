@@ -7,7 +7,7 @@ INCLUDES = -I.
 LINKER_SCRIPT = stm32.ld
 
 CFLAGS += -mcpu=cortex-m3 -mthumb # Processor setup
-CFLAGS += -O2 # Optimization is off
+CFLAGS += -O2 # Optimization ON
 CFLAGS += -g2 # Generate debug info
 CFLAGS += -fno-common
 CFLAGS += -Wall # Turn on warnings
@@ -61,7 +61,11 @@ $(TARGET).elf: $(OBJS)
 size: $(TARGET).elf
 	@$(SIZE) $(TARGET).elf
 
-burn: $(TARGET).bin
+erase:
+	@st-flash erase
+	@st-flash reset
+
+flash: $(TARGET).bin
 	@st-flash erase
 	@st-flash write $(TARGET).bin 0x8000000
 	@st-flash reset
@@ -81,4 +85,4 @@ clean:
 	@rm -f $(TARGET).lst
 	@rm -f $(TARGET).o
 
-.PHONY: all build size clean burn debug
+.PHONY: all build size clean flash debug
