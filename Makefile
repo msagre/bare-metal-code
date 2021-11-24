@@ -1,4 +1,4 @@
-TARGET ?= dma
+TARGET ?= adc
 SRCS = $(TARGET).c
 
 OBJS =  $(addsuffix .o, $(basename $(SRCS)))
