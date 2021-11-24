@@ -383,10 +383,10 @@ int main(void)
 		uint8_t *tx_ptr = tx_data;
 
 
-		tock	   = tick;
 		tx_data[4] = '\r';
 		tx_data[5] = '\n';
 
+		tock  = tick;
 		state = S_SYSTICK;
 		for(;;) {
 
