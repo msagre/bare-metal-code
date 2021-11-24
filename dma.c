@@ -366,6 +366,7 @@ int main(void)
 {
 	enum states { S_SYSTICK, S_ADC, S_TXDATA };
 	enum states state;
+	uint8_t tx_data[6];
 	uint8_t *tx_ptr;
 
 	// PCLK code
@@ -432,9 +433,11 @@ int main(void)
 	tock       = tick;
 	tx_req     = tx_rdy;
 	adc1_2_req = adc1_2_rdy;
+
 	state = S_SYSTICK;
+	tx_data[4] = '\n';
+	tx_data[5] = '\r';
 	for(;;) {
-		uint8_t tx_data[4];
 
 		switch (state) {
 		case S_SYSTICK :
@@ -452,7 +455,7 @@ int main(void)
 				uint8_t *dst;
 
 				dr  = DEVMAP->ADC[ADC1].REGs.DR;
-				dst = tx_data+sizeof(tx_data);
+				dst = tx_data+sizeof(tx_data)-2;
 				while (tx_data < dst--) {
 					*dst = hextab[(dr & 0xf)];
 					dr >>= 4;
