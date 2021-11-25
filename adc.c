@@ -351,7 +351,7 @@ int main(void)
 	DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);					// Set ADC ON state
 	DEVMAP->ADC[ADC1].REGs.CR1	&= ~(1 << 8);				// SCAN mode disabled
 	DEVMAP->ADC[ADC1].REGs.SQR3 &= ~0xFFFFFFFF;				// Clears whole 32bit register
-	DEVMAP->ADC[ADC1].REGs.SQR3 |= (14 << 0);				// First conversion in regular sequence
+	DEVMAP->ADC[ADC1].REGs.SQR3 |= (0b0001 << 0);			// First conversion in regular sequence
 	DEVMAP->ADC[ADC1].REGs.CR2	&= ~(1 << 1);				// Single conversion
 	DEVMAP->ADC[ADC1].REGs.CR2	&= ~(1 << 11);				// Right alignment
 	DEVMAP->ADC[ADC1].REGs.CR1	|= (1 << 5);				// Enable EOC Interrupt
