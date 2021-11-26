@@ -355,12 +355,12 @@ int main(void)
 
 	CTX->SYSTICK.REGs.CSR  = 0x00000;						// Clear register, set to run at AHB/8 -> 72 Mhz/8 = 9 Mhz
 	CTX->SYSTICK.REGs.CSR |= (1 << 1);						// Enable interrupt
-	CTX->SYSTICK.REGs.RVR = 9000000;							// Set 1 second tick
+	CTX->SYSTICK.REGs.RVR = 72e6/8;							// Set 1 second tick
 	CTX->SYSTICK.REGs.CSR |= (1 << 0);						// Enable SysTick
 	CTX->SYSTICK.REGs.CVR = 0;								// Clear register to start
 
 	// ADC code
-	DEVMAP->RCC.REGs.CFGR |= (0b00 << 14);					// Set ADC prescaler to 4
+	DEVMAP->RCC.REGs.CFGR    |= (0b10 << 14);					// Set ADCPRE 72Mhz/6 = 12Mhz
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);					// Enable ADC clock
 
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
