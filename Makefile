@@ -76,13 +76,13 @@ debug:
 	--eval-command="layout regs" \
 	 $(TARGET).elf
 
-clean:
+clean: 
 	@echo "Cleaning..."
-	@rm -f $(TARGET).elf
-	@rm -f $(TARGET).bin
-	@rm -f $(TARGET).map
-	@rm -f $(TARGET).hex
-	@rm -f $(TARGET).lst
-	@rm -f $(TARGET).o
+	@rm -f adc.elf dma.elf # $(TARGET).elf
+	@rm -f adc.bin dma.bin # $(TARGET).bin
+	@rm -f adc.map dma.map # $(TARGET).map
+	@rm -f adc.hex dma.hex # $(TARGET).hex
+	@rm -f adc.lst dma.lst # $(TARGET).lst
+	@rm -f adc.o   dma.o   # $(TARGET).o
 
 .PHONY: all build size clean flash debug
