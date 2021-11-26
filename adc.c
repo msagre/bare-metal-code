@@ -336,7 +336,7 @@ int main(void)
 	DEVMAP->RCC.REGs.CFGR |= (0b0111 << 18);				// Set PLLMULL to 9. Set PLL output clock to 72 Mhz
 	DEVMAP->RCC.REGs.CFGR |=  (1 << 16);					// Select HSE as the PLL source clock
 	DEVMAP->RCC.REGs.CR   |=  (1 << 24);					// Enable PLL
-	while (!(DEVMAP->RCC.REGs.CR & (1 << 25)));				// Wait for PLL is locked
+	while (!(DEVMAP->RCC.REGs.CR & (1 << 25)));				// Wait for PLL to lock
 
 	DEVMAP->FLASH.REGs.ACR |= (0b010 << 0);					// Set FLASH WAIT STATE to 2
 	DEVMAP->RCC.REGs.CFGR  |= (0b0000 << 4);				// Set AHB HPRE division to 1. Set AHB clock to 72 Mhz
