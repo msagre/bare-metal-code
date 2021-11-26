@@ -180,6 +180,21 @@ struct {
 		page reserved;
 	} RCC;
 
+	word_t reservedB[(0x40022000-0x40021400)/sizeof(word_t)];
+	union {
+		struct {
+			uint32_t ACR;
+			uint32_t KEYR;
+			uint32_t OPTKEYR;
+			uint32_t SR;
+			uint32_t CR;
+			uint32_t AR;
+			uint32_t reserved;
+			uint32_t OBR;
+			uint32_t WRPR;
+		} REGs;
+		page reserved;
+	} FLASH;
 } volatile *const DEVMAP = (void *) 0x40000000;
 
 #define ENA_IRQ(IRQ) {CTX->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
@@ -318,12 +333,15 @@ int main(void)
 	while (!(DEVMAP->RCC.REGs.CR & (1 << 17)));				// Wait for HSE is locked
 
 	DEVMAP->RCC.REGs.CR   &= ~(1 << 24);					// Disable PLL
-	DEVMAP->RCC.REGs.CFGR |= (0b0100 << 18);				// Set PLLMULL to 6. Set PLL output clock to 48 Mhz
+	DEVMAP->RCC.REGs.CFGR |= (0b0111 << 18);				// Set PLLMULL to 9. Set PLL output clock to 72 Mhz
 	DEVMAP->RCC.REGs.CFGR |=  (1 << 16);					// Select HSE as the PLL source clock
 	DEVMAP->RCC.REGs.CR   |=  (1 << 24);					// Enable PLL
 	while (!(DEVMAP->RCC.REGs.CR & (1 << 25)));				// Wait for PLL is locked
 
-	DEVMAP->RCC.REGs.CFGR |= (0b1000 << 4);					// Set AHB HPRE division to 2. Set AHB clock to 24 Mhz
+	DEVMAP->FLASH.REGs.ACR |= (0b010 << 0);					// Set FLASH WAIT STATE to 2
+	DEVMAP->RCC.REGs.CFGR  |= (0b0000 << 4);				// Set AHB HPRE division to 1. Set AHB clock to 72 Mhz
+	DEVMAP->RCC.REGs.CFGR  |= (0b100 << 8);					// Set APB1 PPRE1 division to 2. Set AHB clock to 36 Mhz
+	DEVMAP->RCC.REGs.CFGR  |= (0b10 << 14);					// Set ADCPRE 72Mhz/6 = 12Mhz
 
 	DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);					// Select PLL clock as the system clock
 	while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));			// Wait for PLL clock to be selected
@@ -335,9 +353,9 @@ int main(void)
 	DEVMAP->GPIOs[GPIOC].REGs.CRH = 0x33333333;				// Make high GPIOC output
 	DEVMAP->GPIOs[GPIOC].REGs.ODR = 0;
 
-	CTX->SYSTICK.REGs.CSR  = 0x00000;						// Clear register, set to run at AHB/8 -> 24 Mhz/8 = 3 Mhz
+	CTX->SYSTICK.REGs.CSR  = 0x00000;						// Clear register, set to run at AHB/8 -> 72 Mhz/8 = 9 Mhz
 	CTX->SYSTICK.REGs.CSR |= (1 << 1);						// Enable interrupt
-	CTX->SYSTICK.REGs.RVR = 3000000;						// Set 1 second tick
+	CTX->SYSTICK.REGs.RVR = 9000000;							// Set 1 second tick
 	CTX->SYSTICK.REGs.CSR |= (1 << 0);						// Enable SysTick
 	CTX->SYSTICK.REGs.CVR = 0;								// Clear register to start
 
@@ -367,7 +385,7 @@ int main(void)
 	DEVMAP->USART1.REGs.CR1 = 0;
 	DEVMAP->USART1.REGs.CR1 &= ~(1 << 12);					// Word length - leave default (8 data)
 	DEVMAP->USART1.REGs.CR2 |= (0b00 << 12);				// Number of stop bits - leave default (1 stop)
-	DEVMAP->USART1.REGs.BRR =  2500;						// Set BRR to (24 Mhz/9600 bdps) = 2500
+	DEVMAP->USART1.REGs.BRR =  72e6/9600;					// Set BRR to (72 Mhz/9600 bdps) = 7500
 	DEVMAP->USART1.REGs.CR1 |= (1 << 3);					// Transmitter enable
 //	DEVMAP->USART1.REGs.CR1 |= (1 << 5);					// RXNEIE : Enable RXNE Interrupt
 //	DEVMAP->USART1.REGs.CR1 |= (1 << 2);					// Receiver enable
