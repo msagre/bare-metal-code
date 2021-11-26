@@ -94,10 +94,8 @@ struct {
 	page BKP;
 	page PWR;
 	word_t reserved6[(0x40010000-0x40007400)/sizeof(word_t)];
-
 	page AFIO;
 	page EXTI;
-
 	union {
 		struct {
 			uint32_t CRL;
@@ -161,7 +159,6 @@ struct {
 		page reserved;
 	} DMAs[1];
 	word_t reservedA[(0x40021000-0x40020400)/sizeof(word_t)];
-
 	union {
 		struct {
 			uint32_t CR;
@@ -179,7 +176,6 @@ struct {
 		} REGs;
 		page reserved;
 	} RCC;
-
 	word_t reservedB[(0x40022000-0x40021400)/sizeof(word_t)];
 	union {
 		struct {
@@ -257,7 +253,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,														// 0x0000_0030
 	0,														// 0x0000_0034
 	0,														// 0x0000_0038
-	handler_systick,										// 0x0000_003C System tick timer
+	handler_systick,										// 0x0000_003C SYSTICK
 	0,														// 0x0000_0040
 	0,														// 0x0000_0044
 	0,														// 0x0000_0048
@@ -329,13 +325,13 @@ int main(void)
 {
 
 	// PCLK code
-	DEVMAP->RCC.REGs.CR   |= (1 << 16);						// Enable HSE
+	DEVMAP->RCC.REGs.CR    |= (1 << 16);					// Enable HSE
 	while (!(DEVMAP->RCC.REGs.CR & (1 << 17)));				// Wait for HSE is locked
 
-	DEVMAP->RCC.REGs.CR   &= ~(1 << 24);					// Disable PLL
-	DEVMAP->RCC.REGs.CFGR |= (0b0111 << 18);				// Set PLLMULL to 9. Set PLL output clock to 72 Mhz
-	DEVMAP->RCC.REGs.CFGR |=  (1 << 16);					// Select HSE as the PLL source clock
-	DEVMAP->RCC.REGs.CR   |=  (1 << 24);					// Enable PLL
+	DEVMAP->RCC.REGs.CR    &= ~(1 << 24);					// Disable PLL
+	DEVMAP->RCC.REGs.CFGR  |= (0b0111 << 18);				// Set PLLMULL to 9. Set PLL output clock to 72 Mhz
+	DEVMAP->RCC.REGs.CFGR  |=  (1 << 16);					// Select HSE as the PLL source clock
+	DEVMAP->RCC.REGs.CR    |=  (1 << 24);					// Enable PLL
 	while (!(DEVMAP->RCC.REGs.CR & (1 << 25)));				// Wait for PLL to lock
 
 	DEVMAP->FLASH.REGs.ACR |= (0b010 << 0);					// Set FLASH WAIT STATE to 2
@@ -343,7 +339,7 @@ int main(void)
 	DEVMAP->RCC.REGs.CFGR  |= (0b100 << 8);					// Set APB1 PPRE1 division to 2. Set AHB clock to 36 Mhz
 	DEVMAP->RCC.REGs.CFGR  |= (0b10 << 14);					// Set ADCPRE 72Mhz/6 = 12Mhz
 
-	DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);					// Select PLL clock as the system clock
+	DEVMAP->RCC.REGs.CFGR  |= (0b10 << 0);					// Select PLL clock as the system clock
 	while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));			// Wait for PLL clock to be selected
 
 	// SYSTICK Code
@@ -353,20 +349,20 @@ int main(void)
 	DEVMAP->GPIOs[GPIOC].REGs.CRH = 0x33333333;				// Make high GPIOC output
 	DEVMAP->GPIOs[GPIOC].REGs.ODR = 0;
 
+	CTX->SYSTICK.REGs.RVR = 72e6/8;							// Set 1 second tick
 	CTX->SYSTICK.REGs.CSR  = 0x00000;						// Clear register, set to run at AHB/8 -> 72 Mhz/8 = 9 Mhz
 	CTX->SYSTICK.REGs.CSR |= (1 << 1);						// Enable interrupt
-	CTX->SYSTICK.REGs.RVR = 72e6/8;							// Set 1 second tick
 	CTX->SYSTICK.REGs.CSR |= (1 << 0);						// Enable SysTick
 	CTX->SYSTICK.REGs.CVR = 0;								// Clear register to start
 
 	// ADC code
-	DEVMAP->RCC.REGs.CFGR    |= (0b10 << 14);				// Set ADCPRE 72Mhz/6 = 12Mhz
+	DEVMAP->RCC.REGs.CFGR    |= (0b10 << 14);				// Set ADCPRE 14 MHz > 72Mhz/6 = 12Mhz
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);					// Enable ADC clock
 
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
 	DEVMAP->GPIOs[GPIOA].REGs.CRL &= 0xFFFFFF0F;			// Set PA1 as analog input for ADC channel 1
 
-	DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);					// Set ADC ON state
+	DEVMAP->ADC[ADC1].REGs.CR2  |= (1 << 0);				// Set ADC ON state
 	DEVMAP->ADC[ADC1].REGs.CR1	&= ~(1 << 8);				// SCAN mode disabled
 	DEVMAP->ADC[ADC1].REGs.SQR3 &= ~0xFFFFFFFF;				// Clears whole 32bit register
 	DEVMAP->ADC[ADC1].REGs.SQR3 |= (0b0001 << 0);			// First conversion in regular sequence
@@ -400,7 +396,6 @@ int main(void)
 		uint8_t tx_data[6];
 		uint8_t *tx_ptr = tx_data;
 
-
 		tx_data[4] = '\r';
 		tx_data[5] = '\n';
 
@@ -412,7 +407,7 @@ int main(void)
 			switch (state) {
 			case S_SYSTICK :
 				if (tick != tock) {
-					DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);		// Set ADC ON state
+					DEVMAP->ADC[ADC1].REGs.CR2 |= (1 << 0);			// Set ADC ON state
 					tock = tick;
 					adc1_2_req = !adc1_2_rdy;
 					state = S_ADC;
@@ -425,7 +420,7 @@ int main(void)
 					uint8_t *dst;
 
 					dr	= DEVMAP->ADC[ADC1].REGs.DR;
-					dst = tx_data+sizeof(tx_data)-2;
+					dst = tx_data+sizeof(tx_data)-2*sizeof(char);	// Substract CR,LF
 					while (tx_data < dst--) {
 						*dst = hextab[(dr & 0xf)];
 						dr >>= 4;
@@ -440,15 +435,16 @@ int main(void)
 					if (tx_req == tx_rdy) {
 						tx_req = !tx_rdy;
 						DEVMAP->USART1.REGs.DR = *tx_ptr++;
-						DEVMAP->USART1.REGs.CR1 |= (1 << 7);	// TXEIE : Enable TXE Interrupt 
+						DEVMAP->USART1.REGs.CR1 |= (1 << 7);	// TXEIE : Enable TXE Interrupt
 					}
 				} else {
 					state = S_SYSTICK;
 					DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
 				}
+				break;
 			}
 		}
 	}
-	
+
 	return 0;
 }
