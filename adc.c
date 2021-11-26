@@ -360,7 +360,7 @@ int main(void)
 	CTX->SYSTICK.REGs.CVR = 0;								// Clear register to start
 
 	// ADC code
-	DEVMAP->RCC.REGs.CFGR    |= (0b10 << 14);					// Set ADCPRE 72Mhz/6 = 12Mhz
+	DEVMAP->RCC.REGs.CFGR    |= (0b10 << 14);				// Set ADCPRE 72Mhz/6 = 12Mhz
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 9);					// Enable ADC clock
 
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
