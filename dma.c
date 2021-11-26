@@ -179,7 +179,22 @@ struct {
 		} REGs;
 		page reserved;
 	} RCC;
+	word_t reservedB[(0x40022000-0x40021400)/sizeof(word_t)];
 
+	union {
+		struct {
+			uint32_t ACR;
+			uint32_t KEYR;
+			uint32_t OPTKEYR;
+			uint32_t SR;
+			uint32_t CR;
+			uint32_t AR;
+			uint32_t reserved;
+			uint32_t OBR;
+			uint32_t WRPR;
+		} REGs;
+		page reserved;
+	} FLASH;
 } volatile *const DEVMAP = (void *) 0x40000000;
 
 #define ENA_IRQ(IRQ) {CTX->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
@@ -335,12 +350,14 @@ int main(void)
 	while (!(DEVMAP->RCC.REGs.CR & (1 << 17)));				// Wait for HSE is locked
 
 	DEVMAP->RCC.REGs.CR   &= ~(1 << 24);					// Disable PLL
-	DEVMAP->RCC.REGs.CFGR |= (0b0100 << 18);				// Set PLLMULL to 6. Set PLL output clock to 48 Mhz
+	DEVMAP->RCC.REGs.CFGR |= (0b0111 << 18);				// Set PLLMULL to 9. Set PLL output clock to 72 Mhz
 	DEVMAP->RCC.REGs.CFGR |=  (1 << 16);					// Select HSE as the PLL source clock
 	DEVMAP->RCC.REGs.CR   |=  (1 << 24);					// Enable PLL
 	while (!(DEVMAP->RCC.REGs.CR & (1 << 25)));				// Wait for PLL is locked
 
-	DEVMAP->RCC.REGs.CFGR |= (0b1000 << 4);					// Set AHB HPRE division to 2. Set AHB clock to 24 Mhz
+	DEVMAP->FLASH.REGs.ACR |= (0b010 << 0);					// Set FLASH WAIT STATE to 2
+	DEVMAP->RCC.REGs.CFGR  |= (0b0000 << 4);				// Set AHB HPRE division to 1. Set AHB clock to 72 Mhz
+	DEVMAP->RCC.REGs.CFGR  |= (0b100 << 8);					// Set APB1 PPRE1 division to 2. Set AHB clock to 36 Mhz
 
 	DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);					// Select PLL clock as the system clock
 	while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));			// Wait for PLL clock to be selected
@@ -352,7 +369,7 @@ int main(void)
 
 	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;			// Make low GPIOC output
 	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;			// Make high GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+//	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
 
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CNDTR = sizeof(data)/sizeof(uint32_t); // Transfer size
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CMAR	= (uint32_t) data;				 // Memory source address
@@ -376,8 +393,8 @@ int main(void)
 	ENA_IRQ(IRQ_TIM2);										// Enable TIM2 interrupt on NVIC
 	DEVMAP->TIMs[TIM2].REGs.CR1  = 0x0000;					// Reset CR1 just in case
 //	DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 4);				// Down counter mode
-	DEVMAP->TIMs[TIM2].REGs.PSC   = 46874;					// fCK_PSC / (PSC[15:0] + 1)
-	DEVMAP->TIMs[TIM2].REGs.ARR   = 1;
+	DEVMAP->TIMs[TIM2].REGs.PSC   = (72e6/8)/(sizeof(data)/sizeof(data[0]))-1;	// fCK_PSC / (PSC[15:0] + 1)
+	DEVMAP->TIMs[TIM2].REGs.ARR   = 8-1;
 	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 << 14);				// Trigger DMA request enable
 	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  8);				// Update DMA request enable
 //	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  6);				// Enable interrupt
