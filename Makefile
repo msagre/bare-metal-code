@@ -39,48 +39,41 @@ all: clean $(SRCS) build size
 build: $(TARGET).elf $(TARGET).hex $(TARGET).bin $(TARGET).lst
 
 $(TARGET).elf: $(OBJS)
-	@$(CC) $(OBJS) $(LDFLAGS) -o $@
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
 %.o: %.c
-	@echo "Building" $<
-	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 %.o: %.s
-	@echo "Building" $<
-	@$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 %.hex: %.elf
-	@$(OBJCOPY) -O ihex $< $@
+	$(OBJCOPY) -O ihex $< $@
 
 %.bin: %.elf
-	@$(OBJCOPY) -O binary $< $@
+	$(OBJCOPY) -O binary $< $@
 
 %.lst: %.elf
-	@$(OBJDUMP) -x -S $(TARGET).elf > $@
+	$(OBJDUMP) -x -S $(TARGET).elf > $@
 
 size: $(TARGET).elf
-	@$(SIZE) $(TARGET).elf
-
-erase:
-	@st-flash erase
-	@st-flash reset
+	$(SIZE) $(TARGET).elf
 
 ocd-flash : $(TARGET).bin
 	openocd -f openocd.cfg -c "program $(TARGET).bin exit 0x08000000 verify reset exit"
 
 st-flash: $(TARGET).bin
-	@st-flash erase
-	@st-flash write $(TARGET).bin 0x8000000
-	@st-flash reset
+	st-flash erase
+	st-flash write $(TARGET).bin 0x8000000
+	st-flash reset
 
 debug:
-	@$(DBG) -tui --eval-command="target extended-remote :4242" \
+	$(DBG) -tui --eval-command="target extended-remote :4242" \
 	--eval-command="layout asm" \
 	--eval-command="layout regs" \
 	 $(TARGET).elf
 
 clean: 
-	@echo "Cleaning..."
-	@rm -f *.elf *.bin *.map  *.hex *.lst  *.o
+	rm -f *.elf *.bin *.map  *.hex *.lst  *.o
 
 .PHONY: all build size clean flash debug
