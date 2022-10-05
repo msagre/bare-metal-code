@@ -12,20 +12,21 @@ typedef unsigned short uint16_t;
 typedef unsigned char  uint8_t;
 
 typedef void(*interrupt_t)(void);
+void main(void);
 
 const interrupt_t vector_table[256] __attribute__ ((section(".vtab"))) = {
 	STACKINIT,												// 0x0000_0000 Stack Pointer
 	(interrupt_t) main,										// 0x0000_0004 Reset
 };
 
-int main(void)
+void main(void)
 {
 
 	// DMA code
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
+//	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);				// Enable GPIOC clock.
 
-	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;			// Make low GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;			// Make high GPIOC output
+//	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;			// Make low GPIOC output
+//	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;			// Make high GPIOC output
 //	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
 
 
