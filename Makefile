@@ -65,6 +65,14 @@ erase:
 	@st-flash erase
 	@st-flash reset
 
+ocd-flash : $(TARGET).bin
+	openocd -f openocd.cfg -c "program $(TARGET).bin exit 0x08000000 verify reset exit"
+
+st-flash: $(TARGET).bin
+	@st-flash erase
+	@st-flash write $(TARGET).bin 0x8000000
+	@st-flash reset
+
 flash: $(TARGET).bin
 	@st-flash erase
 	@st-flash write $(TARGET).bin 0x8000000
