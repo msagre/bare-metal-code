@@ -81,11 +81,6 @@ debug:
 
 clean: 
 	@echo "Cleaning..."
-	@rm -f $(TARGET).elf
-	@rm -f $(TARGET).bin
-	@rm -f $(TARGET).map
-	@rm -f $(TARGET).hex
-	@rm -f $(TARGET).lst
-	@rm -f $(TARGET).o
+	@rm -f *.elf *.bin *.map  *.hex *.lst  *.o
 
 .PHONY: all build size clean flash debug
