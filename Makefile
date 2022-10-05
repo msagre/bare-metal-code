@@ -73,11 +73,6 @@ st-flash: $(TARGET).bin
 	@st-flash write $(TARGET).bin 0x8000000
 	@st-flash reset
 
-flash: $(TARGET).bin
-	@st-flash erase
-	@st-flash write $(TARGET).bin 0x8000000
-	@st-flash reset
-
 debug:
 	@$(DBG) -tui --eval-command="target extended-remote :4242" \
 	--eval-command="layout asm" \
