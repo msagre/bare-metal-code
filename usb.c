@@ -88,6 +88,13 @@ struct {
 	page I2C[2];
     union {
         struct {
+            uint32_t EPR[8];
+            uint32_t reseved[8];
+            uint32_t CNTR;
+            uint32_t ISTR;
+            uint32_t FNR;
+            uint32_t DADDR;
+            uint32_t BTABLE;
         } REGs;
         page reserved;
     } USB;
