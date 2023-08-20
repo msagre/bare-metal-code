@@ -86,7 +86,11 @@ struct {
 	page USART[2];
 	word_t reserved4[(0x40005400-0x40004c00)/sizeof(word_t)];
 	page I2C[2];
-	page USB;
+    union {
+        struct {
+        } REGs;
+        page reserved;
+    } USB;
 	page USBCAN_SRAM;
 	page bxCAN;
 	word_t reserved5[(0x40006c00-0x40006800)/sizeof(word_t)];
