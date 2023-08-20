@@ -9,7 +9,7 @@ typedef unsigned char  uint8_t;
 
 int main(void)
 {
-	// DMA code
+
 	// DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
 
 	// DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;            // Make low GPIOC output
