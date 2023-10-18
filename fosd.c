@@ -52,6 +52,7 @@ int main(void)
 
 	int   acc[2] = { 0, 0 };
 	pcm_t fdbk = 0;
+
 	printf("%4s %6s %6s %8s %8s %6s\n", "n", "sample", "fdbk", "acc1", "acc2", "output");
 	for(int i = 0; i < sizeof(sintab)/sizeof(sintab[0]); i++) {
 		unsigned char sd;
