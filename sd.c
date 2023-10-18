@@ -5,8 +5,9 @@
 typedef unsigned short pcm_t;
 
 #define TABSIZE 64
-#define MAXVAL  ((pcm_t) ((1 << (sizeof(pcm_t)*8))-1))
-#define MAXHALF ((pcm_t)  (1 << (sizeof(pcm_t)*8-1)))
+#define RESOLUTION 15
+#define MAXVAL  ((pcm_t) ((1 << RESOLUTION)-1))
+#define MAXHALF ((pcm_t)  (1 << (RESOLUTION-1)))
 
 unsigned char fosd (pcm_t pcm, int acc[1], pcm_t fdbk) 
 {
