@@ -1,4 +1,4 @@
-TARGET ?= mitarea
+TARGET ?= dma1
 SRCS = $(TARGET).c
 
 OBJS =  $(addsuffix .o, $(basename $(SRCS)))

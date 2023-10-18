@@ -4,6 +4,7 @@
 
 typedef unsigned short pcm_t;
 
+#define TABSIZE 64
 #define MAXVAL  ((pcm_t) ((1 << (sizeof(pcm_t)*8))-1))
 #define MAXHALF ((pcm_t)  (1 << (sizeof(pcm_t)*8-1)))
 
@@ -44,16 +45,16 @@ unsigned char sosd (pcm_t pcm, int acc[2], pcm_t fdbk)
 int main(void)
 {
 	const double pi = 4*atan(1.0);
-	pcm_t sintab[64];
+	pcm_t sintab[TABSIZE];
 
-	for(int i = 0; i < sizeof(sintab)/sizeof(sintab[0]); i++) {
-		sintab[i] = ((1 << (sizeof(pcm_t)*8))-1)*((sin(2.0*pi*i/(sizeof(sintab)/sizeof(sintab[0])))+1.0)/2.0);
+	for(int i = 0; i < TABSIZE; i++) {
+		sintab[i] = (MAXVAL/2)*sin(2.0*pi*i/TABSIZE)+MAXHALF;
 	}
 
 	int   acc[2] = { 0, 0 };
 	pcm_t fdbk = 0;
 	printf("%4s %6s %6s %8s %8s %6s\n", "n", "sample", "fdbk", "acc1", "acc2", "output");
-	for(int i = 0; i < sizeof(sintab)/sizeof(sintab[0]); i++) {
+	for(int i = 0; i < TABSIZE; i++) {
 		unsigned char sd;
 		// sd = sosd(sintab[i], acc, fdbk);
 		sd = fosd(sintab[i], acc, fdbk);
