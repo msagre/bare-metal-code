@@ -1,73 +1,63 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <stdbool.h>
 
 typedef unsigned short pcm_t;
-const pcm_t half = (1 << (sizeof(pcm_t)*8-1));
 
-void fosd (bool *sd, pcm_t *pcm, int n)
+#define MAXVAL  ((pcm_t) ((1 << (sizeof(pcm_t)*8))-1))
+#define MAXHALF ((pcm_t)  (1 << (sizeof(pcm_t)*8-1)))
+
+unsigned char fosd (pcm_t pcm, int acc[1], pcm_t fdbk) 
 {
-    int acc;
-    pcm_t out;
+	int diff;
 
-    acc = 0;
-    out = 0;
-    printf("%4s %6s %6s %6s %8s %6s\n", "n", "sample", "fdbk", "diff", "acc", "output");
-    for (int i = 0; i < n; i++) {
-        int diff;
+	diff =   fdbk;
+	diff +=  pcm;
+	diff >>= 1;
 
-        diff =   out;
-        diff +=  pcm[i];
-        diff >>= 1;
-
-        acc += diff-half;
-        sd[i] = (out > 0) ? 0 : 1;
-        printf("%4u %6hu %6hu %6d %8d %6d\n", i, pcm[i], out, diff, acc, sd[i]);
-        out = (acc > 0) ? 0 : (1 << (8*sizeof(pcm_t)))-1; 
-    }
+	acc[0] += diff-MAXHALF;
+	return (acc[0] > 0) ? 1 : 0;
 }
 
-void sosd (bool *sd, pcm_t *pcm, int n)
+unsigned char sosd (pcm_t pcm, int acc[2], pcm_t fdbk)
 {
+	int diff1;
+	int diff2;
 
-    int acc1;
-    int acc2;
-    pcm_t out;
+	diff1 =   fdbk;
+	diff1 +=  pcm;
+	diff1 >>= 1;
 
-    acc1 = 0;
-    acc2 = 0;
-    out  = 0;
-    printf("%4s %6s %6s %6s %8s %6s %8s %6s\n", "n", "sample", "fdbk", "diff1", "acc1", "diff2", "acc2", "output");
-    for (int i = 0; i < n; i++) {
-        int diff1;
-        int diff2;
+	acc[0] += diff1-MAXHALF;
 
-        diff1 =   out;
-        diff1 +=  pcm[i];
-        diff1 >>= 1;
+	diff2  = acc[0];
+	diff2 += MAXHALF;
+	diff2 += fdbk;
+	diff2 >>= 1;
 
-        acc1  += diff1-half;
-        diff2 += (acc1+half+out)/2;
-        acc2  += (diff2-half)/2;
-        sd[i] = (out > 0) ? 0 : 1;
-        // printf("%4u %6hu %6hu %6d %8d %6d\n", i, pcm[i], out, diff, acc, sd[i]);
-        out = (acc2 > 0) ? 0 : (1 << (8*sizeof(pcm_t)))-1; 
-    }
+	acc[1] += diff2;
+	acc[1] -= MAXHALF;
+
+	return (acc[1] > 0) ? 1 : 0;
 }
 
 int main(void)
 {
-    const double pi = 4*atan(1.0);
-    pcm_t sintab[128];
-    bool sd[sizeof(sintab)/sizeof(sintab[0])];
+	const double pi = 4*atan(1.0);
+	pcm_t sintab[64];
 
-    for(int i = 0; i < sizeof(sintab)/sizeof(sintab[0]); i++) {
-        sintab[i] = ((1 << (sizeof(pcm_t)*8))-1)*((sin(2.0*pi*i/(sizeof(sintab)/sizeof(sintab[0])))+1.0)/2.0);
-    }
+	for(int i = 0; i < sizeof(sintab)/sizeof(sintab[0]); i++) {
+		sintab[i] = ((1 << (sizeof(pcm_t)*8))-1)*((sin(2.0*pi*i/(sizeof(sintab)/sizeof(sintab[0])))+1.0)/2.0);
+	}
 
-    fosd(sd, sintab, sizeof(sintab)/sizeof(sintab[0]));
-    for(int i = 0; i < sizeof(sintab)/sizeof(sintab[0]); i++) {
-        printf("%4d\n", sd[i]);
-    }
+	int   acc[2] = { 0, 0 };
+	pcm_t fdbk = 0;
+	printf("%4s %6s %6s %8s %8s %6s\n", "n", "sample", "fdbk", "acc1", "acc2", "output");
+	for(int i = 0; i < sizeof(sintab)/sizeof(sintab[0]); i++) {
+		unsigned char sd;
+		// sd = sosd(sintab[i], acc, fdbk);
+		sd = fosd(sintab[i], acc, fdbk);
+		printf("%4u %6hu %6hu %8d %8d %6d\n", i, sintab[i], fdbk, acc[0], acc[1], sd);
+		fdbk = (sd > 0) ? 0 : MAXVAL;
+	}
 }
