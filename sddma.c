@@ -308,9 +308,8 @@ void handler_tim2(void)
 }
 
 #define RESOLUTION 15
-#define TABSIZE 4096
-#define MAXVAL  ((pcm_t) ((1 << RESOLUTION)-1))
-#define MAXHALF ((pcm_t)  (1 << (RESOLUTION-1)))
+#define MAXVAL  ((unsigned short) ((1 << RESOLUTION)-1))
+#define MAXHALF ((unsigned short)  (1 << (RESOLUTION-1)))
 #define TABSIZE 4096
 typedef unsigned short pcm_t;
 const unsigned short sintab[TABSIZE] = {
@@ -680,7 +679,7 @@ int main(void)
 		idr &= 0xf;
 		idr = 0b0001;
 		if (idr_last != idr) {
-			uint8_t fdbk = 0;
+			unsigned short fdbk = 0;
 
 			for (int i = 0; i < TABSIZE-1; i++) {
 				uint32_t sample = 0;

@@ -16,10 +16,9 @@ int main(void)
 	const double pi = 4*atan(1.0);
 	pcm_t sintab[TABSIZE];
 
-	printf("#define RESOLUTION 15\n");
-	printf("#define TABSIZE 4096\n");
-	printf("#define MAXVAL  ((pcm_t) ((1 << RESOLUTION)-1))\n");
-	printf("#define MAXHALF ((pcm_t)  (1 << (RESOLUTION-1)))\n");
+	printf("#define RESOLUTION %d\n", RESOLUTION);
+	printf("#define MAXVAL  ((unsigned short) ((1 << RESOLUTION)-1))\n");
+	printf("#define MAXHALF ((unsigned short)  (1 << (RESOLUTION-1)))\n");
 	printf("#define TABSIZE %d\n", TABSIZE);
 	printf("const unsigned short sintab[TABSIZE] = {", TABSIZE);
 	int j = 0;
