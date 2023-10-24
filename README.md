@@ -5,4 +5,7 @@
 2. Compilador para el Cortex-M3. Descargar la version **AArch32 bare-metal target**
    - Arm GNU Toolchain : https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads. 
 
-https://docs.google.com/spreadsheets/d/1gKd5WqaIyFJg3CTexJnXEOfESXx1HqKb8QK8SQSMM50/edit?usp=sharing
+Sigma Delta spreadsheet https://docs.google.com/spreadsheets/d/1gKd5WqaIyFJg3CTexJnXEOfESXx1HqKb8QK8SQSMM50/edit?usp=sharing
+
+
+https://drive.google.com/file/d/1_5GcartM06_qEmwM9RhmmWBqbWMy_91n/view?usp=sharing
