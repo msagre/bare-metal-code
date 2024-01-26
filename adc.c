@@ -376,7 +376,7 @@ int main(void)
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 14);					// Enable UART1 clock
 
 	DEVMAP->GPIOs[GPIOA].REGs.CRH &= 0xFFFFF00F;
-	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x000009B0;			// PA10 : RX, PA9 TX
+	DEVMAP->GPIOs[GPIOA].REGs.CRH |= 0x000004B0;			// PA10 : RX, PA9 TX
 
 	DEVMAP->USART1.REGs.CR1 = 0;
 	DEVMAP->USART1.REGs.CR1 &= ~(1 << 12);					// Word length - leave default (8 data)
