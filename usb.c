@@ -88,17 +88,20 @@ struct {
 	page I2C[2];
     union {
         struct {
-            uint32_t EPR[8];
-            uint32_t reseved[8];
-            uint32_t CNTR;
-            uint32_t ISTR;
-            uint32_t FNR;
-            uint32_t DADDR;
-            uint32_t BTABLE;
+            uint32_t USB_EPR[8];
+            uint32_t USB_reserved[8];
+            uint32_t USB_CNTR;
+            uint32_t USB_ISTR;
+            uint32_t USB_FNR;
+            uint32_t USB_DADDR;
+            uint32_t USB_BTABLE;
         } REGs;
         page reserved;
     } USB;
-	page USBCAN_SRAM;
+	union {
+		word_t RAM[512/sizeof(uint16_t)];
+        page reserved;
+	} USBCAN_SRAM;
 	page bxCAN;
 	word_t reserved5[(0x40006c00-0x40006800)/sizeof(word_t)];
 	page BKP;
@@ -244,8 +247,10 @@ struct {
 enum IRQs {
 	IRQ_DMA1CHN2  = 12,
 	IRQ_ADC1_2	  = 18,
+	IRQ_USBHIGH	  = 19,
+	IRQ_USBLOW	  = 20,
 	IRQ_TIM2	  = 28,
-	IRQ_USART1	  = 37,
+	IRQ_USART1	  = 37
 };
 
 int  main(void);
@@ -254,6 +259,8 @@ void handler_dma1chn2(void);
 void handler_adc1_2(void);
 void handler_tim2(void);
 void handler_usart1(void);
+void handler_usbhigh(void);
+void handler_usblow(void);
 
 const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	STACKINIT,												// 0x0000_0000 Stack Pointer
@@ -291,8 +298,8 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,														// 0x0000_0080
 	0,														// 0x0000_0084
 	0,														// 0x0000_0088
-	0,														// 0x0000_008C
-	0,														// 0x0000_0090
+	handler_usbhigh,										// 0x0000_008C
+	handler_usblow,											// 0x0000_0090
 	0,														// 0x0000_0094
 	0,														// 0x0000_0098
 	0,														// 0x0000_009C
@@ -300,57 +307,85 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,														// 0x0000_00A4
 	0,														// 0x0000_00A8
 	0,														// 0x0000_00AC
-	handler_tim2,											// 0x0000_00B0 TIM2
+	handler_tim2											// 0x0000_00B0 TIM2
 };
 
-void handler_dma1chn2(void)
-{
-
-//	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
-	DEVMAP->DMAs[DMA1].REGs.IFCR |= (0xf << 1);
-	CLR_IRQ(IRQ_DMA1CHN2);
-}
-
-void handler_tim2(void)
+void handler_usbhigh(void)
 {
 	DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
-	CLR_IRQ(IRQ_TIM2);
+	CLR_IRQ(IRQ_USBHIGH);
 }
 
-// One cycle first order sigma delta sin signal
-uint32_t const data[256] = {
-	0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000,
-	0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000,
-	0x00002000, 0x00000000, 0x00002000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000,
-	0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00000000,
-	0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000,
-	0x00002000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00002000,
-	0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00002000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00002000,
-	0x00000000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000, 0x00002000, 0x00000000};
+void handler_usblow(void)
+{
+	DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
+	CLR_IRQ(IRQ_USBLOW);
+}
+
+#define SHORT2CHAR(w16) (w16&0xff), (w16>>8)&0xff
+#define TOUTF16(w8)     (w8 &0xff), 0x00
+
+const char device_dscptr[] ={
+		0x12,   // bLength
+		0x01,   // bDescriptorType
+		SHORT2CHAR(0x0110), // bcdUSB
+		0x00,   // bDeviceClass
+		0x00,   // bDeviceSubClass
+		0x00,   // bDeviceProtocol
+		0x40,   // bMaxPacketSize0
+		SHORT2CHAR(0x1234),  // idVendor
+		SHORT2CHAR(0xabcd),  // idProduct
+		SHORT2CHAR(0x0100),  // bcdDevice
+		0x01,    // iManufacturer
+		0x00,    // iProduct
+		0x00,    // iSerialNumber
+		0x01};    // bNumConfigurations
+const char config_dscptr[] = {
+		0x09,    // bLength
+		0x02,    // bDescriptorType
+		SHORT2CHAR(0x0020), // wTotalLength
+		0x01,    // bNumInterfaces
+		0x01,    // bConfigurationValue
+		0x00,    // iConfiguration
+		0xc0,    // bmAttribute
+		0x32};    // MaxPower
+const char string_dscptr[] = {
+		0x04,    // 
+		0x03,    // bDescriptorType
+		SHORT2CHAR(0x0409), // 
+		0x12,    // 
+		0x03,    // bDescriptorType
+		TOUTF16('H'),
+		TOUTF16('D'),
+		TOUTF16('L'),
+		TOUTF16('4'),
+		TOUTF16('F'),
+		TOUTF16('P'),
+		TOUTF16('G'),
+		TOUTF16('A')};
+const char interface_dscptr [] = {
+		0x09,    // bLength
+		0x04,    // bDescriptorType
+		0x00,    // bInterfaceNumber
+		0x00,    // bAlternateSetting
+		0x02,    // bNumEndpoints
+		0x00,    // bInterfaceClass
+		0x00,    // bInterfaceSubClass
+		0x00,    // bIntefaceProtocol
+		0x00};   // iInterface
+const char endpoint_dscptr [] = {
+		0x07,     // bLength
+		0x05,     // bDescriptorType
+		0x01,     // bEndpointAddress
+		0x02,     // bmAttibutes
+		SHORT2CHAR(0x0040),  // wMaxPacketSize
+		0x00,     // bInterval
+		0x07,     // bLength
+		0x05,     // bDescriptorType
+		0x81,     // bEndpointAddress
+		0x02,     // bmAttibutes
+		SHORT2CHAR(0x0040),  // wMaxPacketSize
+		0x00};    // Interval
 
 int main(void)
 {
@@ -374,45 +409,13 @@ int main(void)
 
 	// DMA code
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
-	DEVMAP->RCC.REGs.APB1ENR |= (1 << 0);					// Enable TIM2 clock.
-	DEVMAP->RCC.REGs.AHBENR  |= (1 << 0);					// Enable DMA1 clock.
 
 	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;			// Make low GPIOC output
 	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;			// Make high GPIOC output
 //	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
 
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CNDTR = sizeof(data)/sizeof(uint32_t); // Transfer size
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CMAR	= (uint32_t) data;				 // Memory source address
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CPAR	= (uint32_t) &DEVMAP->GPIOs[GPIOC].REGs.ODR; // Peripheral destination address
-
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR  = 0;				// Reset CCR
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR &= ~(1 << 14);	// Disable memory to memory transfer on DMA1 channel 2
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (0b11 << 12); // Set DMA priority to very high
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (0b10 << 10); // Set memory transfer size to 32-bits
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (0b10 << 8);	// Set peripheral transfer size to 32-bits
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 7);		// Enable memory increment mode
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR &= ~(1 << 6);		// Disable peripheral increment mode
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 5);		// Enable circular mode
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 4);		// Read from memory
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 2);		// Enable half transfer completed interrupt
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 1);		// Enable transfer completed interrupt
-	ENA_IRQ(IRQ_DMA1CHN2);									// Enable DMA1 Channel2 inturrupt on NVIC
-
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |= (1 << 0);		// Enable DMA
-
-	ENA_IRQ(IRQ_TIM2);										// Enable TIM2 interrupt on NVIC
-	DEVMAP->TIMs[TIM2].REGs.CR1  = 0x0000;					// Reset CR1 just in case
-//	DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 4);				// Down counter mode
-	DEVMAP->TIMs[TIM2].REGs.PSC   = (72e6/8)/(sizeof(data)/sizeof(data[0]))-1;	// fCK_PSC / (PSC[15:0] + 1)
-	DEVMAP->TIMs[TIM2].REGs.ARR   = 8-1;
-	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 << 14);				// Trigger DMA request enable
-	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  8);				// Update DMA request enable
-//	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  6);				// Enable interrupt
-//	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  0);				// Update interrupt enable
-
-	DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 0);				// Finally enable TIM1 module
-
-
+	DEVMAP->RCC.REGs.APB1ENR |= (1 << 23);					// Enable USB clock.
+	DEVMAP->USB.REGs.USB_BTABLE = 0;
 	for(;;);
 
 	return 0;
