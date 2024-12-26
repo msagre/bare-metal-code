@@ -21,16 +21,21 @@
 // more details at http://www.gnu.org/licenses/.							  //
 //																			  //
 
+#ifdef GCC
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#endif
+
 #define SRAM_SIZE ((uint32_t) 0x00005000)
 #define SRAM_BASE ((uint32_t) 0x20000000)
 #define STACKINIT ((interrupt_t)(SRAM_BASE+SRAM_SIZE))
 
-typedef int            int32_t;
-typedef short          int16_t;
-typedef char           int8_t;
+#ifndef _STDINT_H
 typedef unsigned int   uint32_t;
 typedef unsigned short uint16_t;
 typedef unsigned char  uint8_t;
+#endif
 
 typedef void(*interrupt_t)(void);
 
@@ -49,7 +54,7 @@ enum {GPIOA = 0, GPIOB = 1, GPIOC = 2, GPIOD = 3, GPIOE = 4, GPIOF = 5 };
 enum {DMA1	= 0 };
 enum {CHN1	= 0, CHN2  = 1, CHN3  = 2, CHN4  = 3, CHN5	= 4, CHN6  = 5, CHN7 = 6, CHN8 = 7 };
 enum {ADC1	= 0 };
-struct {
+struct DEVMAP_t {
 	union {
 		struct {
 			uint32_t CR1;
@@ -88,18 +93,24 @@ struct {
 	page I2C[2];
     union {
         struct {
-            uint32_t USB_EPR[8];
-            uint32_t USB_reserved[8];
-            uint32_t USB_CNTR;
-            uint32_t USB_ISTR;
-            uint32_t USB_FNR;
-            uint32_t USB_DADDR;
-            uint32_t USB_BTABLE;
+            uint32_t EPR[8];
+            uint32_t reserved[8];
+            uint32_t CNTR;
+            uint32_t ISTR;
+            uint32_t FNR;
+            uint32_t DADDR;
+            uint32_t BTABLE;
         } REGs;
         page reserved;
     } USB;
 	union {
-		word_t RAM[512/sizeof(uint16_t)];
+		uint32_t MEM[512/sizeof(uint16_t)];
+		struct {
+			uint32_t ADDR_TX;
+			uint32_t COUNT_TX;
+			uint32_t ADDR_RX;
+			uint32_t COUNT_RX;
+		} ENTRY[8];
         page reserved;
 	} USBCAN_SRAM;
 	page bxCAN;
@@ -193,7 +204,6 @@ struct {
 		page reserved;
 	} RCC;
 	word_t reservedB[(0x40022000-0x40021400)/sizeof(word_t)];
-
 	union {
 		struct {
 			uint32_t ACR;
@@ -208,7 +218,13 @@ struct {
 		} REGs;
 		page reserved;
 	} FLASH;
-} volatile *const DEVMAP = (void *) 0x40000000;
+}
+#ifndef USBRAM
+volatile *const DEVMAP = (void *) 0x40000000;
+#else
+DEVMAPs;
+volatile struct DEVMAP_t *const DEVMAP = &DEVMAPs;
+#endif
 
 #define ENA_IRQ(IRQ) {CTX->NVIC.REGs.ISER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
 #define DIS_IRQ(IRQ) {CTX->NVIC.REGs.ICER[((uint32_t)(IRQ) >> 5)] = (1 << ((uint32_t)(IRQ) & 0x1F));}
@@ -259,7 +275,7 @@ void handler_dma1chn2(void);
 void handler_adc1_2(void);
 void handler_tim2(void);
 void handler_usart1(void);
-void handler_usbhigh(void);
+void handler_usbhp(void);
 void handler_usblow(void);
 
 const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
@@ -267,18 +283,22 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	(interrupt_t) main,										// 0x0000_0004 Reset
 	0,														// 0x0000_0008
 	0,														// 0x0000_000C
+
 	0,														// 0x0000_0010
 	0,														// 0x0000_0014
 	0,														// 0x0000_0018
 	0,														// 0x0000_001C
+
 	0,														// 0x0000_0020
 	0,														// 0x0000_0024
 	0,														// 0x0000_0028
 	0,														// 0x0000_002C
+
 	0,														// 0x0000_0030
 	0,														// 0x0000_0034
 	0,														// 0x0000_0038
-	0,														// 0x0000_003C
+	handler_systick,										// 0x0000_003C
+
 	0,														// 0x0000_0040
 	0,														// 0x0000_0044
 	0,														// 0x0000_0048
@@ -291,14 +311,14 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,														// 0x0000_0064
 	0,														// 0x0000_0068
 	0,														// 0x0000_006C
-	handler_dma1chn2,										// 0x0000_0070 DMA1_CHN2
+	0,														// 0x0000_0070 DMA1_CHN2
 	0,														// 0x0000_0074
 	0,														// 0x0000_0078
 	0,														// 0x0000_007C
 	0,														// 0x0000_0080
 	0,														// 0x0000_0084
 	0,														// 0x0000_0088
-	handler_usbhigh,										// 0x0000_008C
+	handler_usbhp,										// 0x0000_008C
 	handler_usblow,											// 0x0000_0090
 	0,														// 0x0000_0094
 	0,														// 0x0000_0098
@@ -307,89 +327,181 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,														// 0x0000_00A4
 	0,														// 0x0000_00A8
 	0,														// 0x0000_00AC
-	handler_tim2											// 0x0000_00B0 TIM2
+	0														// 0x0000_00B0 TIM2
 };
 
-void handler_usbhigh(void)
-{
-	DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
-	CLR_IRQ(IRQ_USBHIGH);
+volatile uint32_t blink_count;
+void handler_systick() {
+	static uint32_t dly;
+	static uint32_t bcntr;
+	static uint32_t cntr;
+
+	if (cntr++ >= (dly & 0xfff)) {
+		if (bcntr < 2*blink_count) {
+			DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
+			dly = 500;
+			bcntr++;
+		} else {
+			DEVMAP->GPIOs[GPIOC].REGs.ODR = -1;
+			dly = 1000;
+			bcntr = 0;
+		}
+		cntr = 0;
+	}
 }
 
-void handler_usblow(void)
-{
-	DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
-	CLR_IRQ(IRQ_USBLOW);
+void delay_ms(uint32_t ticks) {
+	for (uint32_t i = 0; i < ticks; i++) {
+		while(!(CTX->SYSTICK.REGs.CSR & (1 << 16)));
+	}
 }
+
+#define USBREGs (&DEVMAP->USB.REGs)
+
+// void handler_usblow(void)
+// {
+	// CLR_IRQ(IRQ_USBLOW);
+// }
 
 #define SHORT2CHAR(w16) (w16&0xff), (w16>>8)&0xff
 #define TOUTF16(w8)     (w8 &0xff), 0x00
 
-const char device_dscptr[] ={
-		0x12,   // bLength
-		0x01,   // bDescriptorType
-		SHORT2CHAR(0x0110), // bcdUSB
-		0x00,   // bDeviceClass
-		0x00,   // bDeviceSubClass
-		0x00,   // bDeviceProtocol
-		0x40,   // bMaxPacketSize0
-		SHORT2CHAR(0x1234),  // idVendor
-		SHORT2CHAR(0xabcd),  // idProduct
-		SHORT2CHAR(0x0100),  // bcdDevice
-		0x01,    // iManufacturer
-		0x00,    // iProduct
-		0x00,    // iSerialNumber
-		0x01};    // bNumConfigurations
-const char config_dscptr[] = {
-		0x09,    // bLength
-		0x02,    // bDescriptorType
-		SHORT2CHAR(0x0020), // wTotalLength
-		0x01,    // bNumInterfaces
-		0x01,    // bConfigurationValue
-		0x00,    // iConfiguration
-		0xc0,    // bmAttribute
-		0x32};    // MaxPower
-const char string_dscptr[] = {
-		0x04,    // 
-		0x03,    // bDescriptorType
-		SHORT2CHAR(0x0409), // 
-		0x12,    // 
-		0x03,    // bDescriptorType
-		TOUTF16('H'),
-		TOUTF16('D'),
-		TOUTF16('L'),
-		TOUTF16('4'),
-		TOUTF16('F'),
-		TOUTF16('P'),
-		TOUTF16('G'),
-		TOUTF16('A')};
-const char interface_dscptr [] = {
-		0x09,    // bLength
-		0x04,    // bDescriptorType
-		0x00,    // bInterfaceNumber
-		0x00,    // bAlternateSetting
-		0x02,    // bNumEndpoints
-		0x00,    // bInterfaceClass
-		0x00,    // bInterfaceSubClass
-		0x00,    // bIntefaceProtocol
-		0x00};   // iInterface
-const char endpoint_dscptr [] = {
-		0x07,     // bLength
-		0x05,     // bDescriptorType
-		0x01,     // bEndpointAddress
-		0x02,     // bmAttibutes
-		SHORT2CHAR(0x0040),  // wMaxPacketSize
-		0x00,     // bInterval
-		0x07,     // bLength
-		0x05,     // bDescriptorType
-		0x81,     // bEndpointAddress
-		0x02,     // bmAttibutes
-		SHORT2CHAR(0x0040),  // wMaxPacketSize
-		0x00};    // Interval
+const uint8_t device_dscptr[] __attribute__((aligned(1))) ={
+	0x12,   // bLength
+	0x01,   // bDescriptorType
+	SHORT2CHAR(0x0110), // bcdUSB
+	0x00,   // bDeviceClass
+	0x00,   // bDeviceSubClass
+	0x00,   // bDeviceProtocol
+	0x40,   // bMaxPacketSize0
+	SHORT2CHAR(0x1234),  // idVendor
+	SHORT2CHAR(0xabcd),  // idProduct
+	SHORT2CHAR(0x0100),  // bcdDevice
+	// 0x01,    // iManufacturer
+	0x00,    // iManufacturer
+	0x00,    // iProduct
+	0x00,    // iSerialNumber
+	0x01};    // bNumConfigurations
+const uint8_t config_dscptr[]  __attribute__((aligned(1)))= {
+	0x09,    // bLength
+	0x02,    // bDescriptorType
+	SHORT2CHAR(0x0020), // wTotalLength
+	0x01,    // bNumInterfaces
+	0x01,    // bConfigurationValue
+	0x00,    // iConfiguration
+	0xc0,    // bmAttribute
+	0x32};    // MaxPower
+const uint8_t interface_dscptr []  __attribute__((aligned(1)))= {
+	0x09,    // bLength
+	0x04,    // bDescriptorType
+	0x00,    // bInterfaceNumber
+	0x00,    // bAlternateSetting
+	0x02,    // bNumEndpoints
+	0x00,    // bInterfaceClass
+	0x00,    // bInterfaceSubClass
+	0x00,    // bIntefaceProtocol
+	0x00};   // iInterface
+const uint8_t endpoint_dscptr []  __attribute__((aligned(1)))= {
+	0x07,     // bLength
+	0x05,     // bDescriptorType
+	0x01,     // bEndpointAddress
+	0x02,     // bmAttibutes
+	SHORT2CHAR(0x0040),  // wMaxPacketSize
+	0x00,     // bInterval
+	0x07,     // bLength
+	0x05,     // bDescriptorType
+	0x81,     // bEndpointAddress
+	0x02,     // bmAttibutes
+	SHORT2CHAR(0x0040),  // wMaxPacketSize
+	0x00};    // Interval
+
+const uint8_t string_dscptr[]  __attribute__((aligned(1)))= {
+	0x04,    // 
+	0x03,    // bDescriptorType
+	SHORT2CHAR(0x0409), // 
+	0x12,    // 
+	0x03,    // bDescriptorType
+	TOUTF16('H'),
+	TOUTF16('D'),
+	TOUTF16('L'),
+	TOUTF16('4'),
+	TOUTF16('F'),
+	TOUTF16('P'),
+	TOUTF16('G'),
+	TOUTF16('A')};
+
+const int descriptor_length = sizeof(device_dscptr)+ sizeof(config_dscptr)+ sizeof(interface_dscptr)+ sizeof(endpoint_dscptr);
+
+void mem2usbcpy (uint32_t dst, const uint8_t *src, uint32_t length)
+{
+	uint32_t i;
+
+	for (i = 0; i < length/sizeof(uint16_t); i++) {
+		DEVMAP->USBCAN_SRAM.MEM[dst+i] = (src[2*i+1] << 8) + src[2*i];
+	}
+	if (descriptor_length%2) {
+		DEVMAP->USBCAN_SRAM.MEM[i] = src[2*i];
+	}
+}
+
+void handler_usbhp(void)
+{
+	CLR_IRQ(IRQ_USBHIGH);
+	blink_count = 5;
+}
+
+void handler_usblow(void)
+{
+    if ((USBREGs->ISTR & (1 << 10))) {
+        USBREGs->ISTR = ~(1 << 10);  // Clear interrupt
+		if (!(USBREGs->ISTR & (1 << 10))){
+			blink_count = 3;
+		}
+		USBREGs->EPR[0] = 0b01 << 9; // EP_TYPE -> CONTROL;
+		// USBREGs->EPR[0] |= ((USBREGs->EPR[0]^(0b11 << 12)) & (0b11 << 12)); // STAT_RX
+		// USBREGs->EPR[0] |= ((USBREGs->EPR[0]^(0b11 <<  4)) & (0b11 <<  4)); // STAT_TX
+		// if ((USBREGs->EPR[0] >> 9) & 0b11) {
+		if ((USBREGs->EPR[0] >> 9) & 0b11) {
+			// blink_count = 4;
+			// blink_count = ((USBREGs->EPR[0] >> 9) & 0b11);
+		}
+        USBREGs->DADDR = (1 << 7); // Enable function
+    } else {
+    }
+	CLR_IRQ(IRQ_USBLOW);
+}
 
 int main(void)
 {
 
+ #ifdef GCC
+	for (int i =0; i < descriptor_length; i++ )
+		printf("%02x ", device_dscptr[i]);
+	putchar('\n');
+	printf("USBRAM    %8p\n", (void*)&DEVMAP->USBCAN_SRAM);
+	printf("USBCNTR   %8p\n", (void*)&USBREGs->CNTR);
+	printf("USBISTR   %8p\n", (void*)&USBREGs->ISTR);
+	printf("BTABLE    %8p\n", (void*)&DEVMAP->USBCAN_SRAM.ENTRY);
+	printf("ADDR0_TX  %8p\n", (void*)&DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX );
+	printf("COUNT0_TX %8p\n", (void*)&DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX);
+#ifdef USBRAM
+	DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX  = sizeof(DEVMAP->USBCAN_SRAM.ENTRY)/(sizeof(uint32_t)/sizeof(uint16_t));
+	DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX = descriptor_length;
+	DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_RX  = DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX+DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX;
+	DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_RX = 64;
+	printf("ADDR0_TX  %x\n", DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX);
+	printf("COUNT0_TX %x\n", DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX);
+	printf("ADDR0_RX  %x\n", DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_RX);
+	printf("COUNT0_RX %x\n", DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_RX);
+	mem2usbcpy (sizeof(DEVMAP->USBCAN_SRAM.ENTRY)/sizeof(uint32_t), device_dscptr, descriptor_length);
+	for (int i =0; i < 50; i++) {
+		printf("DATA %02x : 0x%08x\n", i, DEVMAP->USBCAN_SRAM.MEM[i]);
+	}
+
+	printf("ADDR_TX %d\n", DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX);
+#endif
+	exit(0);
+#endif
 	// PCLK code
 	DEVMAP->RCC.REGs.CR   |= (1 << 16);						// Enable HSE
 	while (!(DEVMAP->RCC.REGs.CR & (1 << 17)));				// Wait for HSE is locked
@@ -407,16 +519,34 @@ int main(void)
 	DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);					// Select PLL clock as the system clock
 	while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));			// Wait for PLL clock to be selected
 
-	// DMA code
+	// Init systick
+    CTX->SYSTICK.REGs.RVR = (CTX->SYSTICK.REGs.CALIB & ((1 << 24)-1));
+    CTX->SYSTICK.REGs.CSR = (0 << 2)|(1 << 1)|(1 << 0);
+    CTX->SYSTICK.REGs.CVR = 0;
+
 	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
+	DEVMAP->GPIOs[GPIOC].REGs.CRH = 0x3 << ((13-8)*4);      // Make high GPIOC PIN 13 output
+	DEVMAP->GPIOs[GPIOC].REGs.ODR = -1;
 
-	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;			// Make low GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;			// Make high GPIOC output
-//	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= -1;
-
+	// USB 
 	DEVMAP->RCC.REGs.APB1ENR |= (1 << 23);					// Enable USB clock.
-	DEVMAP->USB.REGs.USB_BTABLE = 0;
-	for(;;);
+	mem2usbcpy (sizeof(DEVMAP->USBCAN_SRAM.ENTRY)/sizeof(uint32_t), device_dscptr, descriptor_length);
+    // ENA_IRQ(IRQ_USBLOW);
+    ENA_IRQ(IRQ_USBHIGH);
+    USBREGs->CNTR &= ~(1 <<  1);                            // Exit Power Down
+	delay_ms(1);
+	blink_count = 0;
+    USBREGs->CNTR |= (1 << 15);                            // Correct transfer interrupt mask enabled
+    USBREGs->CNTR |= (1 << 10);                            // Reset Mask
+	DEVMAP->USB.REGs.BTABLE = 0;
+	DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX  = sizeof(DEVMAP->USBCAN_SRAM.ENTRY)/(sizeof(uint32_t)/sizeof(uint16_t));
+	DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX = descriptor_length;
+	DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_RX  = DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX+DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX;
+	DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_RX = 64;
+    USBREGs->CNTR &= ~(1 << 0);                            // Force USB Reset
+	for(;;) {
+		// blink_count = 3;
+	}
 
 	return 0;
 }
