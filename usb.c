@@ -450,19 +450,31 @@ void handler_usbhp(void)
 	blink_count = 5;
 }
 
+void xxx()
+{
+	const uint16_t tm = 0b0111100001110000;
+	uint16_t ep = USBREGs->EPR[0];
+	ep = (0b01 << 9) | (~tm & ep & ~(0b11 << 9));
+	USBREGs->EPR[0] = ep;
+}
+
 void handler_usblow(void)
 {
+	uint16_t xx;
     if ((USBREGs->ISTR & (1 << 10))) {
+		xxx();
         USBREGs->ISTR = ~(1 << 10);  // Clear interrupt
 		if (!(USBREGs->ISTR & (1 << 10))){
-			blink_count = 3;
 		}
-		USBREGs->EPR[0] = 0b01 << 9; // EP_TYPE -> CONTROL;
 		// USBREGs->EPR[0] |= ((USBREGs->EPR[0]^(0b11 << 12)) & (0b11 << 12)); // STAT_RX
 		// USBREGs->EPR[0] |= ((USBREGs->EPR[0]^(0b11 <<  4)) & (0b11 <<  4)); // STAT_TX
 		// if ((USBREGs->EPR[0] >> 9) & 0b11) {
-		if ((USBREGs->EPR[0] >> 9) & 0b11) {
-			// blink_count = 4;
+		USBREGs->EPR[0] = -1;
+		// blink_count = (USBREGs->EPR[0] >> 9) & 0b11;
+		// blink_count = (USBREGs->ISTR >> 10) & 0b11;
+		if (USBREGs->EPR[0]) {
+		// if (xx & (0b11 << 9)) {
+			blink_count = 4;
 			// blink_count = ((USBREGs->EPR[0] >> 9) & 0b11);
 		}
         USBREGs->DADDR = (1 << 7); // Enable function
@@ -518,6 +530,7 @@ int main(void)
 
 	DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);					// Select PLL clock as the system clock
 	while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));			// Wait for PLL clock to be selected
+	DEVMAP->RCC.REGs.CFGR &= ~(1 << 22);				    // Set USBPRE to 1.5
 
 	// Init systick
     CTX->SYSTICK.REGs.RVR = (CTX->SYSTICK.REGs.CALIB & ((1 << 24)-1));
@@ -530,22 +543,25 @@ int main(void)
 
 	// USB 
 	DEVMAP->RCC.REGs.APB1ENR |= (1 << 23);					// Enable USB clock.
-	mem2usbcpy (sizeof(DEVMAP->USBCAN_SRAM.ENTRY)/sizeof(uint32_t), device_dscptr, descriptor_length);
-    // ENA_IRQ(IRQ_USBLOW);
-    ENA_IRQ(IRQ_USBHIGH);
     USBREGs->CNTR &= ~(1 <<  1);                            // Exit Power Down
-	delay_ms(1);
-	blink_count = 0;
-    USBREGs->CNTR |= (1 << 15);                            // Correct transfer interrupt mask enabled
-    USBREGs->CNTR |= (1 << 10);                            // Reset Mask
+	delay_ms(1000);
+	mem2usbcpy (sizeof(DEVMAP->USBCAN_SRAM.ENTRY)/sizeof(uint32_t), device_dscptr, descriptor_length);
+    ENA_IRQ(IRQ_USBLOW);
+    ENA_IRQ(IRQ_USBHIGH);
+	blink_count = 2;
+    // USBREGs->CNTR |=  (1 << 15);                           // Correct transfer interrupt mask enabled
+    // USBREGs->CNTR |=  (1 << 10);                           // Reset Mask
+    USBREGs->CNTR &= ~(1 <<  0);                           // Clear USB Reset
 	DEVMAP->USB.REGs.BTABLE = 0;
 	DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX  = sizeof(DEVMAP->USBCAN_SRAM.ENTRY)/(sizeof(uint32_t)/sizeof(uint16_t));
 	DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX = descriptor_length;
 	DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_RX  = DEVMAP->USBCAN_SRAM.ENTRY[0].ADDR_TX+DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_TX;
 	DEVMAP->USBCAN_SRAM.ENTRY[0].COUNT_RX = 64;
-    USBREGs->CNTR &= ~(1 << 0);                            // Force USB Reset
 	for(;;) {
-		// blink_count = 3;
+		if (USBREGs->CNTR & (1 <<  0))
+			blink_count = 3;
+		else
+			blink_count = 4;
 	}
 
 	return 0;
